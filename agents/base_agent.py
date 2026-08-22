@@ -54,8 +54,7 @@ class BaseAgent:
         if not self.model:
             return "[no model configured]"
         system = self.soul.get("system_prompt", "You are a helpful agent.")
-        if self.token_juice:
-            system = self.token_juice.compress_output(system)
+        # Don't compress SOUL.md — it's the personality
         if context:
             prompt = f"{context}\n\n---\n\n{prompt}"
         response = await self.model.complete(
@@ -90,3 +89,44 @@ class BaseAgent:
             "tools": list(self.tools.keys()),
             "skills": self.skills,
         }
+
+
+class GenericAgent(BaseAgent):
+    """Generic agent that uses SOUL.md as personality."""
+
+    def __init__(self, agent_type: str, soul_file: str, **kwargs):
+        self.AGENT_TYPE = agent_type
+        self.SOUL_FILE = soul_file
+        super().__init__(**kwargs)
+
+    async def run(self, task: str, context: dict | None = None) -> dict:
+        """Execute task using SOUL.md personality."""
+        try:
+            # Build context from memory if available
+            memory_context = ""
+            if self.memory:
+                memory_context = self.memory.super_context(task)
+
+            # Use think() which applies SOUL.md as system prompt
+            response = await self.think(task, context=memory_context)
+
+            # Store result in memory
+            if self.memory:
+                self.memory.store(
+                    f"Agent {self.AGENT_TYPE} completed: {task[:100]}",
+                    source="agent",
+                    agent=self.AGENT_TYPE,
+                    topic=self.AGENT_TYPE
+                )
+
+            return {
+                "agent": self.AGENT_TYPE,
+                "text": response,
+                "status": "ok"
+            }
+        except Exception as e:
+            return {
+                "agent": self.AGENT_TYPE,
+                "text": f"Error: {str(e)}",
+                "status": "error"
+            }

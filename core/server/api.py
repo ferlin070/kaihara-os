@@ -225,16 +225,6 @@ def create_app(command_center) -> FastAPI:
             return {"skills": registry.search_skills(q)}
         return {"skills": registry.list_skills(category=category)}
 
-    @app.get("/api/skills/{skill_id}")
-    async def get_skill(skill_id: str):
-        registry = getattr(command_center, "_skill_registry", None)
-        if not registry:
-            return {"error": "Skill registry not initialized"}
-        skill = registry.get_skill(skill_id)
-        if not skill:
-            return {"error": "Skill not found"}
-        return skill
-
     @app.get("/api/skills/stats")
     async def skills_stats():
         registry = getattr(command_center, "_skill_registry", None)
@@ -248,6 +238,16 @@ def create_app(command_center) -> FastAPI:
         if not registry:
             return {"error": "Skill registry not initialized"}
         return {"categories": registry.get_categories()}
+
+    @app.get("/api/skills/{skill_id}")
+    async def get_skill(skill_id: str):
+        registry = getattr(command_center, "_skill_registry", None)
+        if not registry:
+            return {"error": "Skill registry not initialized"}
+        skill = registry.get_skill(skill_id)
+        if not skill:
+            return {"error": "Skill not found"}
+        return skill
 
     @app.post("/api/skills/create")
     async def create_skill(payload: dict):

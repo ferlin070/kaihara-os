@@ -161,8 +161,7 @@ class CommandCenter:
     async def handle_input(self, source: str, message: str,
                             conv_id: str = "default") -> dict:
         """Main entry: parse intent → split brain → dispatch."""
-        if self.token_juice:
-            message = self.token_juice.compress_output(message, context=source)
+        # Don't compress user input — preserve meaning
 
         # Meta agent: check cache before running
         cache_check = {"should_skip": False}
@@ -201,14 +200,16 @@ class CommandCenter:
         # Meta agent: observe this run
         if self._meta_agent and not cache_check.get("should_skip"):
             try:
+                import time
+                start_time = time.time()
                 await self._meta_agent.observe_run(
                     agent=result.get("agent", "kaihara"),
                     task=message,
                     result=result,
-                    tokens_used=0,
-                    time_taken=0,
+                    tokens_used=result.get("tokens_used", 0),
+                    time_taken=time.time() - start_time,
                     model_used=self.model.default if self.model else "",
-                    success=True,
+                    success=result.get("status") != "error",
                 )
             except Exception:
                 pass

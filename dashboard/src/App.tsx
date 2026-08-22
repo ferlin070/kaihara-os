@@ -13,7 +13,7 @@ import ChannelStatus from './components/ChannelStatus'
 import KernelStatus from './components/KernelStatus'
 import MetaPanel from './components/MetaPanel'
 import AgentMap from './components/AgentMap'
-import { getStatus, sendMessage, type SystemStatus as Status } from './lib/api'
+import { getStatus, sendMessage, getMapState, type SystemStatus as Status } from './lib/api'
 
 export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string }
 
@@ -30,12 +30,18 @@ export default function App() {
       const s = await getStatus()
       setStatus(s)
       if (s.fleet_agents) {
-        setAgents(s.fleet_agents.map((name, i) => ({
-          name,
-          status: i < 2 ? 'running' : 'idle',
-          task: i < 2 ? 'Processing...' : '',
-          progress: i < 2 ? Math.floor(Math.random() * 80) + 10 : 0,
-        })))
+        // Fetch real agent status from agent map
+        const mapData = await getMapState()
+        const agentStatus = s.fleet_agents.map(name => {
+          const mapAgent = mapData.agents[name]
+          return {
+            name,
+            status: mapAgent?.status || 'idle',
+            task: mapAgent?.task || '',
+            progress: mapAgent?.progress || 0,
+          }
+        })
+        setAgents(agentStatus)
       }
     } catch {
       setStatus(null)

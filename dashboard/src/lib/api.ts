@@ -1,6 +1,16 @@
 import React from 'react'
 
-const API_BASE = '/api'
+// Determine API base URL based on environment
+const getApiBase = () => {
+  // If we're on the dashboard domain, use the API domain
+  if (window.location.hostname === 'kaihara-ai.nakhodacloud.top') {
+    return 'https://kaihara-api.nakhodacloud.top/api'
+  }
+  // Otherwise use relative path (for local development)
+  return '/api'
+}
+
+const API_BASE = getApiBase()
 
 export interface ChatResponse {
   response: string
@@ -74,9 +84,11 @@ export function useWebSocket(onMessage: (data: any) => void) {
 
   React.useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.hostname
-    const port = '7000'
-    const ws = new WebSocket(`${protocol}//${host}:${port}/ws`)
+    const host = window.location.hostname === 'kaihara-ai.nakhodacloud.top' 
+      ? 'kaihara-api.nakhodacloud.top' 
+      : window.location.hostname
+    const port = window.location.hostname === 'kaihara-ai.nakhodacloud.top' ? '' : ':7000'
+    const ws = new WebSocket(`${protocol}//${host}${port}/ws`)
     wsRef.current = ws
 
     ws.onopen = () => setConnected(true)

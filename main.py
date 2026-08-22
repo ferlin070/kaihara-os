@@ -140,14 +140,23 @@ def init_kaihara() -> CommandCenter:
     from core.integrations.gdrive import GoogleDrive
     cc._gdrive = GoogleDrive(config.get("gdrive", {}))
 
-    # Register agents
+    # Register agents with proper SOUL.md files
+    from agents.base_agent import GenericAgent
+
+    def create_agent_class(agent_type: str, soul_file: str):
+        """Factory to create agent class with proper type and soul."""
+        class Agent(GenericAgent):
+            AGENT_TYPE = agent_type
+            SOUL_FILE = soul_file
+        return Agent
+
     FleetManager = cc.fleet
-    FleetManager.register("kaihara", BaseAgent)
-    FleetManager.register("coding", BaseAgent)
-    FleetManager.register("marketing", BaseAgent)
-    FleetManager.register("security", BaseAgent)
-    FleetManager.register("deploy", BaseAgent)
-    FleetManager.register("research", BaseAgent)
+    FleetManager.register("kaihara", create_agent_class("kaihara", "kaihara.md"))
+    FleetManager.register("coding", create_agent_class("coding", "coding.md"))
+    FleetManager.register("marketing", create_agent_class("marketing", "marketing.md"))
+    FleetManager.register("security", create_agent_class("security", "security.md"))
+    FleetManager.register("deploy", create_agent_class("deploy", "deploy.md"))
+    FleetManager.register("research", create_agent_class("research", "research.md"))
 
     # Meta Agent (learns from all other agents)
     from agents.meta_agent import MetaAgent
