@@ -13,6 +13,15 @@ import asyncio
 import tomllib
 from pathlib import Path
 
+# Load .env file if exists
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    pass  # python-dotenv not installed, rely on system env vars
+
 # Add project root to path
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))

@@ -27,7 +27,8 @@ reflex_model = "rootsys/deepseek-v4-flash"   # fast triage agent
 [provider.rootsys]
 name = "RootSys Cloud"
 base_url = "https://rootsys.cloud/v1"
-api_key = "fiq-4c421e2fc68c0c4436fdd7bf65cf8b73"
+# API key via env: ROOTSYS_API_KEY
+# Custom header (bukan standard Bearer)
 api_key_header = "X-API-Key"  # custom header (bukan standard Bearer)
 
 [provider.ollama]

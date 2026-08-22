@@ -26,8 +26,10 @@ obsidian-vault/prd/
 
 # Config sensitif (jangan push API keys)
 .env
-.env.*
+.env.local
+.env.production
 *.local
+# .env.example TIDAK diabaikan — boleh push
 
 # IDE
 .vscode/

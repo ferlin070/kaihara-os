@@ -8,50 +8,7 @@ from typing import Any
 
 from agents.base_agent import BaseAgent
 from core.orchestrator.model_router import ModelRouter
-
-
-class IntentParser:
-    """Parse user input to understand intent."""
-
-    SIMPLE_KEYWORDS = [
-        "baca", "read", "summarize", "translate", "check", "list",
-        "show", "papa", "apa", "siapa", "bila", "mana",
-    ]
-    COMPLEX_KEYWORDS = [
-        "bina", "build", "deploy", "analisis", "analyze", "pentest",
-        "scrape", "code", "create", "generate", "research", "design",
-        "automate", "install", "configure",
-    ]
-    WORKFLOW_KEYWORDS = [
-        "automate", "schedule", "every", "trigger", "workflow",
-        "setiap", "jadual", "ulang",
-    ]
-
-    async def parse(self, text: str) -> dict:
-        text_lower = text.lower()
-        intent_type = "unknown"
-        agents = []
-        if any(k in text_lower for k in self.SIMPLE_KEYWORDS):
-            intent_type = "simple"
-        if any(k in text_lower for k in self.COMPLEX_KEYWORDS):
-            intent_type = "complex"
-            if any(k in text_lower for k in ["code", "bina", "build", "deploy"]):
-                agents.append("coding")
-            if any(k in text_lower for k in ["scrape", "market", "analisis"]):
-                agents.append("marketing")
-            if any(k in text_lower for k in ["pentest", "security", "scan"]):
-                agents.append("security")
-            if any(k in text_lower for k in ["deploy", "server", "docker"]):
-                agents.append("deploy")
-            if any(k in text_lower for k in ["research", "cari", "find"]):
-                agents.append("research")
-        is_workflow = any(k in text_lower for k in self.WORKFLOW_KEYWORDS)
-        return {
-            "text": text,
-            "type": intent_type,
-            "agents": agents or ["kaihara"],
-            "is_workflow": is_workflow,
-        }
+from core.orchestrator.intent_parser import IntentParser
 
 
 class SplitBrain:
@@ -192,7 +149,7 @@ class CommandCenter:
         self.memory = memory
         self.model = model_router or ModelRouter(config)
         self.token_juice = token_juice
-        self.intent_parser = IntentParser()
+        self.intent_parser = IntentParser(model_router=self.model)
         self.split_brain = SplitBrain()
         self.fleet = FleetManager(
             config, memory, self.model, token_juice, approval_gate

@@ -8,6 +8,7 @@ import os
 import asyncio
 import traceback
 import io
+import json
 
 # Fix Windows Unicode
 if sys.platform == "win32":
@@ -538,6 +539,164 @@ def test_gdrive_status():
     return True
 
 test("GDrive status check", test_gdrive_status)
+
+
+# ============================================================
+# 13. INTENT PARSER (proper classification)
+# ============================================================
+
+section("13. INTENT PARSER")
+
+def test_intent_simple():
+    from core.orchestrator.intent_parser import IntentParser
+    parser = IntentParser()
+    intent = parser._classify_by_patterns("hello apa khabar")
+    assert intent["type"] == "simple", f"Expected simple, got {intent['type']}"
+    print(f"    'hello apa khabar' → {intent['type']}")
+    return True
+
+test("Intent: simple greeting", test_intent_simple)
+
+
+def test_intent_coding():
+    from core.orchestrator.intent_parser import IntentParser
+    parser = IntentParser()
+    intent = parser._classify_by_patterns("bina website dengan react")
+    assert "coding" in intent["agents"] or intent["type"] == "coding" or intent["type"] == "planning", \
+        f"Expected coding/planning, got {intent}"
+    print(f"    'bina website' → {intent['type']}, agents: {intent['agents']}")
+    return True
+
+test("Intent: coding task", test_intent_coding)
+
+
+def test_intent_security():
+    from core.orchestrator.intent_parser import IntentParser
+    parser = IntentParser()
+    intent = parser._classify_by_patterns("run pentest on example.com")
+    assert "security" in intent["agents"], f"Expected security, got {intent}"
+    print(f"    'pentest' → {intent['type']}, agents: {intent['agents']}")
+    return True
+
+test("Intent: security task", test_intent_security)
+
+
+def test_intent_multi_agent():
+    from core.orchestrator.intent_parser import IntentParser
+    parser = IntentParser()
+    intent = parser._classify_by_patterns("scrape market data then build dashboard")
+    assert len(intent["agents"]) >= 2, f"Expected 2+ agents, got {intent['agents']}"
+    print(f"    Multi: agents={intent['agents']}")
+    return True
+
+test("Intent: multi-agent task", test_intent_multi_agent)
+
+
+def test_intent_confidence():
+    from core.orchestrator.intent_parser import IntentParser
+    parser = IntentParser()
+    intent = parser._classify_by_patterns("hello")
+    assert intent["confidence"] >= 0.0, "Confidence negative"
+    print(f"    Confidence: {intent['confidence']}")
+    return True
+
+test("Intent: confidence score", test_intent_confidence)
+
+
+# ============================================================
+# 14. EDGE CASES + ERROR HANDLING
+# ============================================================
+
+section("14. EDGE CASES + ERROR HANDLING")
+
+def test_empty_input():
+    from core.brain.token_juice import TokenJuice
+    tj = TokenJuice({"enabled": True})
+    result = tj.compress_output("")
+    assert result == "", "Empty input should return empty"
+    print("    Empty string: OK")
+    return True
+
+test("Empty input handling", test_empty_input)
+
+
+def test_none_input():
+    from core.brain.token_juice import TokenJuice
+    tj = TokenJuice({"enabled": True})
+    try:
+        result = tj.compress_output(None)
+        assert result is None or result == ""
+        print("    None input: handled")
+        return True
+    except (TypeError, AttributeError):
+        print("    None input: raised (acceptable)")
+        return True
+
+test("None input handling", test_none_input)
+
+
+def test_unicode_emoji():
+    from core.brain.token_juice import TokenJuice
+    tj = TokenJuice({"enabled": True, "output_compression": True})
+    text = "Hello! How are you today?"
+    result = tj.compress_output(text)
+    assert len(result) <= len(text), "Unicode not handled"
+    print(f"    Unicode: {len(text)} → {len(result)} chars")
+    return True
+
+test("Unicode + emoji handling", test_unicode_emoji)
+
+
+def test_very_long_input():
+    from core.brain.token_juice import TokenJuice
+    tj = TokenJuice({"enabled": True, "input_compression": True})
+    long_json = json.dumps([{"id": i, "name": f"item_{i}"} for i in range(100)])
+    compressed = tj.compress_input(long_json, "json")
+    assert len(compressed) <= len(long_json), "Long input not compressed"
+    print(f"    Long JSON: {len(long_json)} → {len(compressed)} chars")
+    return True
+
+test("Very long input compression", test_very_long_input)
+
+
+def test_memory_empty_query():
+    from core.brain.memory_tree import MemoryTree
+    mem = MemoryTree(db_path="./data/test_kaihara.db",
+                     vault_path="./obsidian-vault")
+    results = mem.recall("", limit=5)
+    assert isinstance(results, list), "Should return list"
+    print(f"    Empty query: {len(results)} results")
+    mem.close()
+    if os.path.exists("./data/test_kaihara.db"):
+        os.unlink("./data/test_kaihara.db")
+    return True
+
+test("Memory empty query", test_memory_empty_query)
+
+
+def test_model_router_no_key():
+    from core.orchestrator.model_router import ModelRouter
+    router = ModelRouter({"provider": {}, "privacy": {"mode": False}})
+    # Should not crash, just return error
+    available = router.list_available()
+    assert isinstance(available, list), "Should return list"
+    print(f"    No providers: {len(available)}")
+    return True
+
+test("Model router no providers", test_model_router_no_key)
+
+
+def test_agent_map_invalid_station():
+    from core.viz.agent_map import AgentMap
+    am = AgentMap()
+    am.move_agent("coding", "nonexistent_station", "test")
+    # Agent should stay at home
+    state = am.get_state()
+    assert state["agents"]["coding"]["station"] != "nonexistent_station"
+    print("    Invalid station: agent stayed home")
+    return True
+
+test("Agent map invalid station", test_agent_map_invalid_station)
 
 
 # ============================================================

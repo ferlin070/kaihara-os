@@ -79,6 +79,9 @@ class ModelRouter:
             "anthropic": "ANTHROPIC_API_KEY",
             "gemini": "GEMINI_API_KEY",
             "openrouter": "OPENROUTER_API_KEY",
+            "rootsys": "ROOTSYS_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "groq": "GROQ_API_KEY",
         }
         env_var = env_map.get(provider, f"{provider.upper()}_API_KEY")
         return os.environ.get(env_var)
