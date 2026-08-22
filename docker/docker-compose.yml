@@ -1,0 +1,149 @@
+# ============================================================
+#  KAIHARA OS — Docker Compose (alternative to Proxmox LXC)
+#  For development or non-Proxmox environments
+# ============================================================
+#  Usage: cd docker && docker compose up -d
+# ============================================================
+
+services:
+  # --- Kaihara Core (API + Command Center) ---
+  kaihara-core:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.core
+    container_name: kaihara-core
+    ports:
+      - "7000:7000"
+    environment:
+      - OLLAMA_HOST=http://kaihara-llm:11434
+      - PYTHONPATH=/app
+    volumes:
+      - kaihara-data:/app/data
+      - kaihara-vault:/app/obsidian-vault
+      - kaihara-config:/app/config
+    depends_on:
+      - kaihara-llm
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+  # --- Ollama LLM (local, free) ---
+  kaihara-llm:
+    image: ollama/ollama:latest
+    container_name: kaihara-llm
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    # GPU support (uncomment if available):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+  # --- Dashboard (nginx serving React build) ---
+  kaihara-dashboard:
+    build:
+      context: ../dashboard
+      dockerfile: ../docker/Dockerfile.dashboard
+    container_name: kaihara-dashboard
+    ports:
+      - "5173:80"
+    depends_on:
+      - kaihara-core
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+  # --- Traefik Reverse Proxy ---
+  traefik:
+    image: traefik:v3.0
+    container_name: kaihara-traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      # - "--certificatesresolvers.letsencrypt.acme.email=your-email@example.com"
+      # - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - letsencrypt:/letsencrypt
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+  # --- Grafana Monitoring ---
+  grafana:
+    image: grafana/grafana:latest
+    container_name: kaihara-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=kaihara
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+  # --- Gitea (self-hosted Git) ---
+  gitea:
+    image: gitea/gitea:latest
+    container_name: kaihara-gitea
+    ports:
+      - "3001:3000"
+      - "2222:22"
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+    volumes:
+      - gitea-data:/data
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+  # --- WhatsApp Bridge (Node.js) ---
+  whatsapp-bridge:
+    build:
+      context: ../core/channels/whatsapp_bridge
+      dockerfile: ../../../docker/Dockerfile.whatsapp
+    container_name: kaihara-whatsapp
+    restart: unless-stopped
+    volumes:
+      - whatsapp-auth:/app/data/whatsapp_auth
+    networks:
+      - kaihara-net
+
+  # --- SearXNG (free web search) ---
+  searxng:
+    image: searxng/searxng:latest
+    container_name: kaihara-searxng
+    ports:
+      - "8888:8080"
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+volumes:
+  kaihara-data:
+  kaihara-vault:
+  kaihara-config:
+  ollama-models:
+  letsencrypt:
+  grafana-data:
+  gitea-data:
+  whatsapp-auth:
+
+networks:
+  kaihara-net:
+    driver: bridge

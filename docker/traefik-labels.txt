@@ -1,0 +1,36 @@
+# ============================================================
+#  Traefik Labels — add to docker-compose services
+#  For automatic SSL + routing
+# ============================================================
+
+# Add these labels to kaihara-core service:
+#   labels:
+#     - "traefik.enable=true"
+#     - "traefik.http.routers.kaihara-api.rule=Host(`api.kaihara.local`)"
+#     - "traefik.http.routers.kaihara-api.entrypoints=websecure"
+#     - "traefik.http.routers.kaihara-api.tls.certresolver=letsencrypt"
+#     - "traefik.http.services.kaihara-api.loadbalancer.server.port=7000"
+
+# Add these labels to kaihara-dashboard service:
+#   labels:
+#     - "traefik.enable=true"
+#     - "traefik.http.routers.kaihara-dash.rule=Host(`kaihara.local`)"
+#     - "traefik.http.routers.kaihara-dash.entrypoints=websecure"
+#     - "traefik.http.routers.kaihara-dash.tls.certresolver=letsencrypt"
+#     - "traefik.http.services.kaihara-dash.loadbalancer.server.port=80"
+
+# Add these labels to grafana service:
+#   labels:
+#     - "traefik.enable=true"
+#     - "traefik.http.routers.grafana.rule=Host(`grafana.kaihara.local`)"
+#     - "traefik.http.routers.grafana.entrypoints=websecure"
+#     - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+#     - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+# Add these labels to gitea service:
+#   labels:
+#     - "traefik.enable=true"
+#     - "traefik.http.routers.gitea.rule=Host(`git.kaihara.local`)"
+#     - "traefik.http.routers.gitea.entrypoints=websecure"
+#     - "traefik.http.routers.gitea.tls.certresolver=letsencrypt"
+#     - "traefik.http.services.gitea.loadbalancer.server.port=3000"

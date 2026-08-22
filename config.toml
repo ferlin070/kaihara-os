@@ -1,0 +1,251 @@
+# ============================================================
+#  KAIHARA OS — Configuration
+#  Personal AI Super-Intelligence & Agentic OS
+# ============================================================
+
+[system]
+name = "Kaihara"
+version = "0.1.0"
+data_dir = "./data"
+obsidian_vault = "./obsidian-vault"
+log_level = "INFO"
+language = "ms"          # primary language: Bahasa Melayu
+
+# ============================================================
+#  MODEL ROUTING (multi-model macam OpenCode)
+# ============================================================
+
+[model]
+default = "rootsys/glm-5.2"
+small_model = "rootsys/deepseek-v4-flash"    # pantas + murah
+reflex_model = "rootsys/deepseek-v4-flash"   # fast triage agent
+
+# ============================================================
+#  PROVIDERS
+# ============================================================
+
+[provider.rootsys]
+name = "RootSys Cloud"
+base_url = "https://rootsys.cloud/v1"
+api_key = "fiq-4c421e2fc68c0c4436fdd7bf65cf8b73"
+api_key_header = "X-API-Key"  # custom header (bukan standard Bearer)
+
+[provider.ollama]
+name = "Ollama (local)"
+base_url = "http://localhost:11434/v1"
+# no api_key needed
+
+[provider.openai]
+name = "OpenAI"
+# api_key = "sk-..."  # set via env: OPENAI_API_KEY
+
+[provider.anthropic]
+name = "Anthropic"
+# api_key = "sk-ant-..."  # set via env: ANTHROPIC_API_KEY
+
+[provider.gemini]
+name = "Google Gemini"
+# api_key = "AIza..."  # set via env: GEMINI_API_KEY
+
+[provider.openrouter]
+name = "OpenRouter (gateway)"
+# api_key = "sk-or-..."  # set via env: OPENROUTER_API_KEY
+
+# ============================================================
+#  AGENT MODEL ROUTING (per-agent model selection)
+# ============================================================
+
+[agent.kaihara]
+model = "rootsys/glm-5.2"
+variant = "default"
+
+[agent.reflex]
+model = "rootsys/deepseek-v4-flash"
+variant = "low"
+
+[agent.deep_reasoner]
+model = "rootsys/glm-5.3"
+variant = "high"
+
+[agent.coding]
+model = "rootsys/kimi-k3"
+
+[agent.research]
+model = "rootsys/glm-5.2"
+
+[agent.marketing]
+model = "rootsys/glm-5.2"
+
+[agent.security]
+model = "rootsys/glm-5.3"
+variant = "think"
+
+[agent.deploy]
+model = "rootsys/deepseek-v4-flash"
+
+[agent.storage]
+model = "rootsys/deepseek-v4-flash"
+
+[agent.notification]
+model = "rootsys/deepseek-v4-flash"
+
+[agent.meta]
+model = "rootsys/deepseek-v4-flash"
+
+# ============================================================
+#  MODEL VARIANTS
+# ============================================================
+
+[model.llama3_1.variants.low]
+num_ctx = 8192
+temperature = 0.3
+
+[model.llama3_1.variants.high]
+num_ctx = 32768
+temperature = 0.7
+
+[model.llama3_1.variants.think]
+num_ctx = 65536
+temperature = 0.5
+
+# ============================================================
+#  PRIVACY MODE (macam OpenHuman)
+# ============================================================
+
+[privacy]
+mode = false   # false = allow cloud providers (rootsys, openai, etc.)
+enforce_in_core = false
+
+# ============================================================
+#  MEMORY (3-tier + TencentDB layered)
+# ============================================================
+
+[memory]
+db_path = "./data/kaihara.db"
+context_window = 20          # messages per conversation
+daily_compression_hour = 3   # Deep Dream runs at 3AM
+auto_fetch_interval = 20    # minutes (subconscious loop)
+
+[memory.recall]
+bm25_weight = 0.4
+vector_weight = 0.4
+graph_weight = 0.2
+rrf_k = 60
+
+# ============================================================
+#  TOKENJUICE (compression: Caveman + RTK + Headroom)
+# ============================================================
+
+[tokenjuice]
+enabled = true
+output_compression = true    # Caveman: drop filler/articles
+input_compression = true     # Headroom: content-aware
+shell_compression = true     # RTK: smart filtering
+cache_originals = true       # always cache before lossy
+drop_compression_on = ["security", "approval", "destructive"]
+
+# ============================================================
+#  SECURITY
+# ============================================================
+
+[security]
+approval_required = [
+    "deploy_to_production",
+    "push_to_git",
+    "send_email",
+    "send_whatsapp",
+    "send_telegram",
+    "run_pentest",
+    "delete_file",
+    "execute_shell",
+    "spend_money",
+    "install_package",
+]
+sandbox_enabled = true
+audit_log = "./data/audit.log"
+
+# ============================================================
+#  CHANNELS
+# ============================================================
+
+[channel.telegram]
+enabled = false
+bot_token = ""  # set via env: TELEGRAM_BOT_TOKEN
+
+[channel.whatsapp]
+enabled = false
+# Baileys config
+
+[channel.email]
+enabled = false
+smtp_host = ""
+smtp_port = 587
+imap_host = ""
+imap_port = 993
+# credentials via env
+
+[channel.dashboard]
+enabled = true
+port = 7000
+
+# ============================================================
+#  VOICE (Jarvis concept)
+# ============================================================
+
+[voice]
+enabled = false
+wake_word = "kaihara"
+stt_engine = "whisper"      # openai-whisper (local)
+tts_engine = "piper"        # Piper (local, natural voice)
+stt_model = "base"
+tts_voice = "en_US-lessig-medium"
+
+# ============================================================
+#  MCP SERVERS
+# ============================================================
+
+[mcp.firecrawl]
+command = "npx"
+args = ["-y", "@anthropic/firecrawl-mcp"]
+
+# ============================================================
+#  INFRASTRUCTURE
+# ============================================================
+
+[server]
+host = "0.0.0.0"
+port = 7000
+websocket_enabled = true
+
+[monitoring]
+grafana_enabled = false
+prometheus_port = 9090
+
+[git]
+gitea_url = ""
+gitea_token = ""  # via env: GITEA_TOKEN
+
+# ============================================================
+#  PROXMOX (LXC isolation)
+# ============================================================
+
+[proxmox]
+enabled = false
+host = ""
+# api credentials via env
+
+# ============================================================
+#  GOOGLE DRIVE (backup + file access + vault sync + reports)
+# ============================================================
+
+[gdrive]
+enabled = false
+remote_name = "gdrive"                    # rclone remote name
+backup_folder = "kaihara-backup"         # backup destination folder
+vault_folder = "kaihara-vault"          # Obsidian vault sync folder
+report_folder = "kaihara-reports"        # reports upload folder
+auto_backup = true                       # auto backup daily
+auto_vault_sync = true                  # auto sync vault
+sync_interval = 60                      # minutes between vault syncs
+# CT 101 (storage01 .22) may already have rclone configured
+# Copy config: scp root@192.168.1.22:/root/.config/rclone/rclone.conf /root/.config/rclone/

@@ -1,0 +1,15 @@
+{
+  "name": "kaihara-whatsapp-bridge",
+  "version": "0.1.0",
+  "description": "WhatsApp Web bridge for Kaihara OS using Baileys",
+  "type": "module",
+  "main": "whatsapp_bridge.js",
+  "scripts": {
+    "start": "node whatsapp_bridge.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.0",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Node
+node_modules/
+dashboard/dist/
+core/channels/whatsapp_bridge/node_modules/
+
+# Data (jangan push ke repo)
+data/
+*.db
+*.db-journal
+*.log
+obsidian-vault/memory/
+obsidian-vault/knowledge/
+obsidian-vault/goals/
+obsidian-vault/briefings/
+obsidian-vault/prd/
+
+# Config sensitif (jangan push API keys)
+.env
+.env.*
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ChromaDB
+data/chroma/
+
+# Backup
+*.tar.gz
+backups/
+
+# WhatsApp auth
+core/channels/whatsapp_bridge/data/

@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1f2937 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+body {
+  margin: 0;
+  font-family: "JetBrains Mono", "Consolas", monospace;
+  background: #0a0e1a;
+  color: #e5e7eb;
+}
+
+@layer components {
+  .hud-panel {
+    @apply bg-kaihara-surface border border-kaihara-border rounded-lg p-4;
+  }
+  .hud-title {
+    @apply text-xs uppercase tracking-wider text-kaihara-muted mb-3;
+  }
+  .status-dot {
+    @apply inline-block w-2 h-2 rounded-full;
+  }
+  .btn {
+    @apply px-3 py-1.5 rounded text-sm font-medium transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-kaihara-primary hover:bg-blue-600 text-white;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-kaihara-border text-kaihara-text;
+  }
+}
+
+.waveform-bar {
+  display: inline-block;
+  width: 3px;
+  margin: 0 1px;
+  background: #06b6d4;
+  border-radius: 2px;
+  animation: wave 0.8s ease-in-out infinite;
+}
+
+@keyframes wave {
+  0%, 100% { height: 4px; }
+  50% { height: 20px; }
+}
