@@ -175,6 +175,10 @@ class IntentParser:
             "scores": scores,
         }
 
+    # Valid fleet agents
+    VALID_AGENTS = {"kaihara", "coding", "marketing", "security",
+                    "deploy", "research", "meta"}
+
     async def _classify_with_llm(self, text: str) -> dict | None:
         """Use LLM for ambiguous intents."""
         try:
@@ -194,9 +198,24 @@ class IntentParser:
             match = re.search(r"\{.*\}", response)
             if match:
                 data = json.loads(match.group(0))
+                # Map LLM agent names to valid fleet agents
+                raw_agents = data.get("agents", ["kaihara"])
+                valid_agents = [a for a in raw_agents if a in self.VALID_AGENTS]
+                if not valid_agents:
+                    # Map by intent type
+                    type_map = {
+                        "coding": ["coding"],
+                        "security": ["security"],
+                        "marketing": ["marketing"],
+                        "research": ["research"],
+                        "deploy": ["deploy"],
+                        "planning": ["kaihara"],
+                        "simple": ["kaihara"],
+                    }
+                    valid_agents = type_map.get(data.get("type", "simple"), ["kaihara"])
                 return {
                     "type": data.get("type", "simple"),
-                    "agents": data.get("agents", ["kaihara"]),
+                    "agents": valid_agents,
                     "confidence": 0.8,
                     "complexity": data.get("complexity", "simple"),
                     "source": "llm",

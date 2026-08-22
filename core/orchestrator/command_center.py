@@ -17,9 +17,8 @@ class SplitBrain:
     async def decide(self, intent: dict) -> str:
         if intent.get("is_workflow"):
             return "workflow"
-        if intent["type"] == "simple":
-            return "reflex"
-        if intent["type"] == "complex":
+        complexity = intent.get("complexity", "simple")
+        if complexity in ("medium", "complex"):
             return "deep"
         return "reflex"
 

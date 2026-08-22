@@ -153,7 +153,7 @@ class AgentMap:
                     agent["moving"] = False
                     agent["status"] = "working"
                 else:
-                    speed = 3
+                    speed = 30
                     agent["x"] += (dx / dist) * speed
                     agent["y"] += (dy / dist) * speed
             # Clear expired speech

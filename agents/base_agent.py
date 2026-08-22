@@ -94,10 +94,12 @@ class BaseAgent:
 class GenericAgent(BaseAgent):
     """Generic agent that uses SOUL.md as personality."""
 
-    def __init__(self, agent_type: str, soul_file: str, **kwargs):
-        self.AGENT_TYPE = agent_type
-        self.SOUL_FILE = soul_file
-        super().__init__(**kwargs)
+    def __init__(self, config: dict, memory=None, model_router=None,
+                 token_juice=None, approval_gate=None, **kwargs):
+        super().__init__(config=config, memory=memory,
+                         model_router=model_router,
+                         token_juice=token_juice,
+                         approval_gate=approval_gate)
 
     async def run(self, task: str, context: dict | None = None) -> dict:
         """Execute task using SOUL.md personality."""
@@ -116,7 +118,6 @@ class GenericAgent(BaseAgent):
                     f"Agent {self.AGENT_TYPE} completed: {task[:100]}",
                     source="agent",
                     agent=self.AGENT_TYPE,
-                    topic=self.AGENT_TYPE
                 )
 
             return {
