@@ -87,10 +87,25 @@ class IntentParser:
 
     def __init__(self, model_router=None):
         self.model = model_router
+        self._cache: dict[str, dict] = {}
+        self._cache_max = 200
+
+    def _cache_key(self, text: str) -> str:
+        """Generate cache key from text (normalized)."""
+        import hashlib
+        return hashlib.sha256(text.lower().strip().encode()).hexdigest()[:16]
 
     async def parse(self, text: str) -> dict:
         """Parse intent from user text. Two-stage: rules → LLM if ambiguous."""
         text_lower = text.lower().strip()
+
+        # Check LLM classification cache first
+        cache_key = self._cache_key(text)
+        if cache_key in self._cache:
+            cached = self._cache[cache_key].copy()
+            cached["text"] = text
+            cached["cached"] = True
+            return cached
 
         # Stage 1: Pattern-based classification
         intent = self._classify_by_patterns(text_lower)
@@ -98,11 +113,17 @@ class IntentParser:
         # Check workflow trigger
         is_workflow = any(k in text_lower for k in self.WORKFLOW_KEYWORDS)
 
-        # Stage 2: If ambiguous, use LLM classification
+        # Stage 2: If ambiguous, use LLM classification (with cache)
         if intent["confidence"] < 0.6 and self.model:
             llm_intent = await self._classify_with_llm(text)
             if llm_intent:
                 intent = llm_intent
+                # Cache the LLM result
+                if len(self._cache) >= self._cache_max:
+                    # Evict oldest (FIFO)
+                    oldest = next(iter(self._cache))
+                    del self._cache[oldest]
+                self._cache[cache_key] = intent
 
         intent["text"] = text
         intent["is_workflow"] = is_workflow

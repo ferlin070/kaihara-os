@@ -174,15 +174,21 @@ python main.py            # Server mode (http://localhost:7000)
 
 ### Available RootSys Models
 
+> **Note:** RootSys Cloud (`rootsys.cloud`) is a custom LLM provider with proprietary model names.
+> These are **not standard OpenAI/Anthropic models** — they are custom deployments on the RootSys platform.
+> To use standard providers (OpenAI, Anthropic, Gemini, Ollama), see [Other Providers](#other-providers).
+
 | Model | Context | Best For |
 |-------|---------|----------|
 | glm-5.2 | 1M | General, balanced |
 | glm-5.3 | 1M | Complex reasoning |
 | deepseek-v4-pro | 1M | Deep tasks |
-| deepseek-v4-flash | — | Fast, cheap |
+| deepseek-v4-flash | — | Fast, cheap (reflex, meta) |
 | kimi-k3 | 1M | Coding, vision |
 | minimax-m3 | — | Vision |
 | gpt-5.6-sol | — | Specialized |
+
+> To get your own RootSys API key, visit [rootsys.cloud](https://rootsys.cloud/).
 
 ### Other Providers
 

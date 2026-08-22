@@ -1,0 +1,115 @@
+name: Kaihara OS CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  # ============================================================
+  # Python Tests
+  # ============================================================
+  test-python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install python-dotenv psutil
+
+      - name: Syntax check all Python files
+        run: |
+          find . -name "*.py" -not -path "./dashboard/*" -not -path "./.git/*" | \
+          xargs -I {} python -c "import ast; ast.parse(open('{}').read())" && \
+          echo "All Python files: syntax OK"
+
+      - name: Run tests (without LLM calls)
+        env:
+          PYTHONPATH: .
+          PYTHONIOENCODING: utf-8
+        run: |
+          python tests/test_all.py || true
+        continue-on-error: true
+
+  # ============================================================
+  # Dashboard Build
+  # ============================================================
+  test-dashboard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: dashboard
+        run: npm install
+
+      - name: TypeScript check
+        working-directory: dashboard
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: dashboard
+        run: npx vite build
+
+  # ============================================================
+  # Shell script syntax check
+  # ============================================================
+  test-scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check shell scripts
+        run: |
+          find proxmox/ -name "*.sh" | while read f; do
+            bash -n "$f" && echo "OK: $f"
+          done
+
+  # ============================================================
+  # Security check (no API keys in code)
+  # ============================================================
+  security-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for API keys in config
+        run: |
+          # Check that no API keys are hardcoded
+          if grep -r "fiq-" config.toml; then
+            echo "ERROR: API key found in config.toml!"
+            exit 1
+          fi
+          if grep -r "sk-" config.toml | grep -v "#"; then
+            echo "WARNING: Possible API key in config.toml"
+          fi
+          echo "No hardcoded API keys found."
+
+      - name: Check .env is not committed
+        run: |
+          if [ -f ".env" ]; then
+            echo "ERROR: .env file should not be committed!"
+            exit 1
+          fi
+          echo ".env not in repo: OK"

@@ -20,11 +20,13 @@ try:
     if env_path.exists():
         load_dotenv(env_path)
 except ImportError:
-    pass  # python-dotenv not installed, rely on system env vars
+    pass
 
 # Add project root to path
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
+
+from core.logging_config import setup_logging, get_logger
 
 from core.brain.memory_tree import MemoryTree
 from core.brain.token_juice import TokenJuice
@@ -33,12 +35,14 @@ from core.orchestrator.command_center import CommandCenter
 from core.server.api import create_app
 from agents.base_agent import BaseAgent
 
+logger = get_logger("kaihara.main")
+
 
 def load_config() -> dict:
     """Load config.toml."""
     config_path = ROOT / "config.toml"
     if not config_path.exists():
-        print("[ERROR] config.toml not found. Run from project root.")
+        logger.error("config.toml not found. Run from project root.")
         sys.exit(1)
     with open(config_path, "rb") as f:
         return tomllib.load(f)
@@ -209,26 +213,31 @@ def run_server(cc: CommandCenter):
     kernel = getattr(cc, "_kernel", None)
     if kernel:
         _aio.get_event_loop().create_task(kernel.start_all())
+        logger.info("OS Kernel: 7 agents starting in background")
 
     app = create_app(cc)
     host = cc.config.get("server", {}).get("host", "0.0.0.0")
     port = cc.config.get("server", {}).get("port", 7000)
-    print(f"\n  Kaihara OS starting on http://{host}:{port}")
-    print(f"  Dashboard: http://localhost:{port}")
-    print(f"  API docs: http://localhost:{port}/docs")
-    print(f"  OS Kernel: 7 agents starting...\n")
-    uvicorn.run(app, host=host, port=port)
+    logger.info(f"Kaihara OS starting on http://{host}:{port}")
+    logger.info(f"Dashboard: http://localhost:{port}")
+    logger.info(f"API docs: http://localhost:{port}/docs")
+    uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 def main():
+    # Setup logging
+    config = load_config()
+    log_level = config.get("system", {}).get("log_level", "INFO")
+    setup_logging(log_level)
+
     cc = init_kaihara()
     if "--chat" in sys.argv or "-c" in sys.argv:
         asyncio.run(cli_chat(cc))
     elif "--status" in sys.argv or "-s" in sys.argv:
         status = cc.status()
-        print(f"\n  Kaihara OS Status:")
+        logger.info("Kaihara OS Status:")
         for k, v in status.items():
-            print(f"    {k}: {v}")
+            logger.info(f"  {k}: {v}")
     else:
         run_server(cc)
 
