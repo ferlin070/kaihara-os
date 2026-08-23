@@ -18,7 +18,7 @@ language = "ms"
 default = "rootsys/glm-5.2"
 small_model = "rootsys/deepseek-v4-flash"
 reflex_model = "rootsys/deepseek-v4-flash"
-fallback_chain = ["9router/ag/gemini-3-flash", "opencode-zen/x-preview-f-free", "ollama/llama3.2:1b"]
+fallback_chain = ["opencode-zen/x-preview-f-free", "9router/ag/gemini-3-flash", "ollama/llama3.2:1b"]
 
 # ============================================================
 #  PROVIDERS
