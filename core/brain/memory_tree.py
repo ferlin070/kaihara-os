@@ -89,6 +89,14 @@ class MemoryTree:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conv_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                timestamp TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_conv ON chat_history(conv_id, id);
             CREATE INDEX IF NOT EXISTS idx_raw_ts ON raw(timestamp);
             CREATE INDEX IF NOT EXISTS idx_summary_topic ON summary(topic);
             CREATE INDEX IF NOT EXISTS idx_daily_date ON daily_memory(date);
@@ -340,19 +348,56 @@ class MemoryTree:
     _context_cache: dict[str, list[dict]] = {}
 
     def add_context(self, conv_id: str, role: str, content: str):
-        """Add to short-term context (in-memory, per conversation)."""
+        """Add to short-term context (in-memory + persistent SQLite)."""
         if conv_id not in self._context_cache:
             self._context_cache[conv_id] = []
+        now = datetime.now().isoformat()
         self._context_cache[conv_id].append({
             "role": role, "content": content,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": now
         })
         max_msgs = self.config.get("context_window", 20)
         if len(self._context_cache[conv_id]) > max_msgs:
             self._context_cache[conv_id] = self._context_cache[conv_id][-max_msgs:]
+        # Persist for chat history (survives restarts & refreshes)
+        try:
+            self.conn.execute(
+                "INSERT INTO chat_history (conv_id, role, content, timestamp) "
+                "VALUES (?,?,?,?)",
+                (conv_id, role, content, now)
+            )
+            self.conn.commit()
+        except Exception:
+            pass
 
     def get_context(self, conv_id: str) -> list[dict]:
         return self._context_cache.get(conv_id, [])
+
+    def get_chat_history(self, conv_id: str, limit: int = 100) -> list[dict]:
+        """Persistent chat history from SQLite."""
+        try:
+            rows = self.conn.execute(
+                "SELECT role, content, timestamp FROM chat_history "
+                "WHERE conv_id = ? ORDER BY id DESC LIMIT ?",
+                (conv_id, limit)
+            ).fetchall()
+            return [
+                {"role": r["role"], "content": r["content"],
+                 "timestamp": r["timestamp"]}
+                for r in reversed(rows)
+            ]
+        except Exception:
+            return []
+
+    def clear_chat_history(self, conv_id: str):
+        """Clear persistent history for a conversation."""
+        try:
+            self.conn.execute(
+                "DELETE FROM chat_history WHERE conv_id = ?", (conv_id,))
+            self._context_cache.pop(conv_id, None)
+            self.conn.commit()
+        except Exception:
+            pass
 
     def clear_context(self, conv_id: str):
         self._context_cache.pop(conv_id, None)

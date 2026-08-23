@@ -54,7 +54,29 @@ export async function sendMessage(message: string, source = 'dashboard'): Promis
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, source }),
+    body: JSON.stringify({ message, source, conv_id: 'dashboard' }),
+  })
+  return res.json()
+}
+
+// ============================================================
+// Persistent Chat History
+// ============================================================
+
+export interface HistoryMsg {
+  role: string
+  text: string
+  timestamp?: string
+}
+
+export async function getChatHistory(convId = 'dashboard', limit = 100): Promise<{ messages: HistoryMsg[] }> {
+  const res = await fetch(`${API_BASE}/chat/history?conv_id=${encodeURIComponent(convId)}&limit=${limit}`)
+  return res.json()
+}
+
+export async function clearChatHistory(convId = 'dashboard'): Promise<any> {
+  const res = await fetch(`${API_BASE}/chat/history?conv_id=${encodeURIComponent(convId)}`, {
+    method: 'DELETE',
   })
   return res.json()
 }

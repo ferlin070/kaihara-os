@@ -105,6 +105,25 @@ def create_app(command_center) -> FastAPI:
         return {"conv_id": conv_id,
                 "context": command_center.memory.get_context(conv_id)}
 
+    @app.get("/api/chat/history")
+    async def chat_history(conv_id: str = "dashboard", limit: int = 100):
+        """Persistent chat history (survives refresh & restart)."""
+        if not command_center.memory:
+            return {"error": "memory not initialized"}
+        msgs = command_center.memory.get_chat_history(conv_id, limit)
+        return {"conv_id": conv_id, "messages": [
+            {"role": m["role"], "text": m["content"],
+             "timestamp": m["timestamp"]} for m in msgs
+        ]}
+
+    @app.delete("/api/chat/history")
+    async def clear_chat(conv_id: str = "dashboard"):
+        """Clear persistent history for a conversation."""
+        if not command_center.memory:
+            return {"error": "memory not initialized"}
+        command_center.memory.clear_chat_history(conv_id)
+        return {"status": "cleared", "conv_id": conv_id}
+
     @app.get("/api/goals")
     async def get_goals():
         if not command_center.memory:

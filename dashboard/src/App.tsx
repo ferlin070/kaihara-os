@@ -13,7 +13,7 @@ import ChannelStatus from './components/ChannelStatus'
 import KernelStatus from './components/KernelStatus'
 import MetaPanel from './components/MetaPanel'
 import AgentMap from './components/AgentMap'
-import { getStatus, sendMessage, getMapState, type SystemStatus as Status } from './lib/api'
+import { getStatus, sendMessage, getMapState, getChatHistory, type SystemStatus as Status } from './lib/api'
 
 export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string }
 
@@ -52,6 +52,31 @@ export default function App() {
     const interval = setInterval(fetchStatus, 15000)
     return () => clearInterval(interval)
   }, [fetchStatus])
+
+  // Load chat history: localStorage first (instant), then server (authoritative)
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('kaihara_chat_history')
+      if (cached) setMessages(JSON.parse(cached))
+    } catch {}
+    getChatHistory().then(({ messages }) => {
+      if (messages && messages.length > 0) {
+        const msgs = messages.map(m => ({
+          role: m.role === 'assistant' ? 'kaihara' : 'user',
+          text: m.text,
+        })) as Msg[]
+        setMessages(msgs)
+        localStorage.setItem('kaihara_chat_history', JSON.stringify(msgs))
+      }
+    }).catch(() => {})
+  }, [])
+
+  // Persist to localStorage on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem('kaihara_chat_history', JSON.stringify(messages.slice(-200)))
+    } catch {}
+  }, [messages])
 
   const handleSend = async (text: string) => {
     setMessages(prev => [...prev, { role: 'user', text }])
