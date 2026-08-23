@@ -864,6 +864,109 @@ test("Competitor analysis tool", test_competitor_analysis)
 
 
 # ============================================================
+# 20. MARKETING SYSTEM
+# ============================================================
+
+section("MARKETING SYSTEM")
+
+def test_marketing_leads():
+    from core.marketing.leads import create_lead, get_leads, update_lead, delete_lead, score_lead
+    # Create
+    lead = create_lead("Test Lead", "test@example.com", "0123456789", "Test Corp", "web", "Test notes")
+    assert lead["id"] > 0
+    assert lead["name"] == "Test Lead"
+    # List
+    leads = get_leads()
+    assert len(leads) >= 1
+    # Update
+    updated = update_lead(lead["id"], status="contacted", score=50)
+    assert updated["status"] == "contacted"
+    # Score
+    score = score_lead(lead["id"])
+    assert score > 0
+    # Delete
+    deleted = delete_lead(lead["id"])
+    assert deleted is True
+    print(f"    Lead CRUD + scoring: OK")
+    return True
+
+test("Marketing leads CRUD", test_marketing_leads)
+
+def test_marketing_clients():
+    from core.marketing.clients import create_client, get_clients, update_client, delete_client, client_stats
+    # Create
+    client = create_client("Test Client", "client@test.com", "0198765432", "Client Corp")
+    assert client["id"] > 0
+    # List
+    clients = get_clients()
+    assert len(clients) >= 1
+    # Update
+    updated = update_client(client["id"], tier="premium")
+    assert updated["tier"] == "premium"
+    # Stats
+    stats = client_stats()
+    assert "total" in stats
+    # Delete
+    deleted = delete_client(client["id"])
+    assert deleted is True
+    print(f"    Client CRUD + stats: OK")
+    return True
+
+test("Marketing clients CRUD", test_marketing_clients)
+
+def test_marketing_campaigns():
+    from core.marketing.campaigns import create_campaign, get_campaigns, delete_campaign
+    campaign = create_campaign("Test Campaign", "Description", "social", 1000, "Young adults")
+    assert campaign["id"] > 0
+    campaigns = get_campaigns()
+    assert len(campaigns) >= 1
+    deleted = delete_campaign(campaign["id"])
+    assert deleted is True
+    print(f"    Campaign CRUD: OK")
+    return True
+
+test("Marketing campaigns CRUD", test_marketing_campaigns)
+
+def test_marketing_content():
+    from core.marketing.campaigns import create_content, get_content, publish_content
+    content = create_content("Test Post", "Hello world!", "post", "instagram", None, ["#test"])
+    assert content["id"] > 0
+    published = publish_content(content["id"])
+    assert published["status"] == "published"
+    print(f"    Content CRUD + publish: OK")
+    return True
+
+test("Marketing content CRUD", test_marketing_content)
+
+def test_marketing_invoices():
+    from core.marketing.clients import create_client, delete_client
+    from core.marketing.invoices import create_invoice, get_invoices, mark_invoice_paid, delete_invoice
+    client = create_client("Invoice Test", "inv@test.com")
+    invoice = create_invoice(client["id"], 500, "Test service", tax_rate=6)
+    assert invoice["id"] > 0
+    assert invoice["total"] == 530.0  # 500 + 6% tax
+    paid = mark_invoice_paid(invoice["id"], "bank", "REF123")
+    assert paid["status"] == "paid"
+    delete_invoice(invoice["id"])
+    delete_client(client["id"])
+    print(f"    Invoice CRUD + tax calc + payment: OK")
+    return True
+
+test("Marketing invoices CRUD", test_marketing_invoices)
+
+def test_marketing_agent():
+    from agents.marketing_agent import MarketingAgent
+    agent = MarketingAgent(config={"soul_dir": "config/soul"})
+    status = agent.status()
+    assert "tools" in status
+    assert len(status["tools"]) > 0
+    print(f"    Marketing agent tools: {len(status['tools'])}")
+    return True
+
+test("Marketing agent init", test_marketing_agent)
+
+
+# ============================================================
 # SUMMARY
 # ============================================================
 

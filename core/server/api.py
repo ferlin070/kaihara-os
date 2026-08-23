@@ -960,6 +960,334 @@ def create_app(command_center) -> FastAPI:
         return svc.update_routing(payload.get("routing", {}))
 
     # ============================================================
+    # Marketing System endpoints
+    # ============================================================
+
+    # --- Leads ---
+    @app.get("/api/marketing/leads")
+    async def marketing_leads(status: str = "", q: str = ""):
+        from core.marketing.leads import get_leads
+        return {"leads": get_leads(status=status or None, search=q or None)}
+
+    @app.post("/api/marketing/leads")
+    async def marketing_create_lead(payload: dict):
+        from core.marketing.leads import create_lead
+        return create_lead(
+            name=payload.get("name", ""),
+            email=payload.get("email", ""),
+            phone=payload.get("phone", ""),
+            company=payload.get("company", ""),
+            source=payload.get("source", "manual"),
+            notes=payload.get("notes", ""),
+            tags=payload.get("tags", []),
+        )
+
+    @app.put("/api/marketing/leads/{lead_id}")
+    async def marketing_update_lead(lead_id: int, payload: dict):
+        from core.marketing.leads import update_lead
+        return update_lead(lead_id, **payload) or {"error": "Lead not found"}
+
+    @app.delete("/api/marketing/leads/{lead_id}")
+    async def marketing_delete_lead(lead_id: int):
+        from core.marketing.leads import delete_lead
+        return {"removed": delete_lead(lead_id)}
+
+    @app.post("/api/marketing/leads/{lead_id}/convert")
+    async def marketing_convert_lead(lead_id: int):
+        from core.marketing.leads import convert_lead_to_client
+        result = convert_lead_to_client(lead_id)
+        return result or {"error": "Lead not found"}
+
+    @app.post("/api/marketing/leads/{lead_id}/score")
+    async def marketing_score_lead(lead_id: int):
+        from core.marketing.leads import score_lead
+        return {"lead_id": lead_id, "score": score_lead(lead_id)}
+
+    @app.get("/api/marketing/leads/stats")
+    async def marketing_lead_stats():
+        from core.marketing.leads import lead_stats
+        return lead_stats()
+
+    # --- Clients ---
+    @app.get("/api/marketing/clients")
+    async def marketing_clients(status: str = "", tier: str = "", q: str = ""):
+        from core.marketing.clients import get_clients
+        return {"clients": get_clients(status=status or None, tier=tier or None, search=q or None)}
+
+    @app.post("/api/marketing/clients")
+    async def marketing_create_client(payload: dict):
+        from core.marketing.clients import create_client
+        return create_client(
+            name=payload.get("name", ""),
+            email=payload.get("email", ""),
+            phone=payload.get("phone", ""),
+            company=payload.get("company", ""),
+            address=payload.get("address", ""),
+            lead_id=payload.get("lead_id"),
+            tier=payload.get("tier", "basic"),
+            notes=payload.get("notes", ""),
+            tags=payload.get("tags", []),
+        )
+
+    @app.put("/api/marketing/clients/{client_id}")
+    async def marketing_update_client(client_id: int, payload: dict):
+        from core.marketing.clients import update_client
+        return update_client(client_id, **payload) or {"error": "Client not found"}
+
+    @app.delete("/api/marketing/clients/{client_id}")
+    async def marketing_delete_client(client_id: int):
+        from core.marketing.clients import delete_client
+        return {"removed": delete_client(client_id)}
+
+    @app.get("/api/marketing/clients/stats")
+    async def marketing_client_stats():
+        from core.marketing.clients import client_stats
+        return client_stats()
+
+    @app.post("/api/marketing/clients/{client_id}/approve")
+    async def marketing_client_approve(client_id: int, payload: dict):
+        from core.marketing.clients import send_approval_request
+        return send_approval_request(
+            client_id=client_id,
+            approval_type=payload.get("type", "service"),
+            ref_id=payload.get("ref_id", client_id),
+            message=payload.get("message", ""),
+            channels=payload.get("channels", ["email"]),
+        )
+
+    # --- Approvals ---
+    @app.get("/api/marketing/approvals")
+    async def marketing_approvals():
+        from core.marketing.clients import get_pending_approvals
+        return {"pending": get_pending_approvals()}
+
+    @app.post("/api/marketing/approvals/{approval_id}/respond")
+    async def marketing_respond_approval(approval_id: int, payload: dict):
+        from core.marketing.clients import respond_to_approval
+        return respond_to_approval(
+            approval_id,
+            response=payload.get("response", ""),
+            approved=payload.get("approved", False),
+        )
+
+    # --- Campaigns ---
+    @app.get("/api/marketing/campaigns")
+    async def marketing_campaigns(status: str = ""):
+        from core.marketing.campaigns import get_campaigns
+        return {"campaigns": get_campaigns(status=status or None)}
+
+    @app.post("/api/marketing/campaigns")
+    async def marketing_create_campaign(payload: dict):
+        from core.marketing.campaigns import create_campaign
+        return create_campaign(
+            name=payload.get("name", ""),
+            description=payload.get("description", ""),
+            campaign_type=payload.get("type", "general"),
+            budget=payload.get("budget", 0),
+            target_audience=payload.get("target_audience", ""),
+            channels=payload.get("channels", []),
+            start_date=payload.get("start_date", ""),
+            end_date=payload.get("end_date", ""),
+        )
+
+    @app.put("/api/marketing/campaigns/{campaign_id}")
+    async def marketing_update_campaign(campaign_id: int, payload: dict):
+        from core.marketing.campaigns import update_campaign
+        return update_campaign(campaign_id, **payload) or {"error": "Campaign not found"}
+
+    @app.delete("/api/marketing/campaigns/{campaign_id}")
+    async def marketing_delete_campaign(campaign_id: int):
+        from core.marketing.campaigns import delete_campaign
+        return {"removed": delete_campaign(campaign_id)}
+
+    @app.get("/api/marketing/campaigns/stats")
+    async def marketing_campaign_stats():
+        from core.marketing.campaigns import campaign_stats
+        return campaign_stats()
+
+    # --- Content ---
+    @app.get("/api/marketing/content")
+    async def marketing_content(status: str = "", platform: str = ""):
+        from core.marketing.campaigns import get_content
+        return {"content": get_content(status=status or None, platform=platform or None)}
+
+    @app.post("/api/marketing/content")
+    async def marketing_create_content(payload: dict):
+        from core.marketing.campaigns import create_content
+        return create_content(
+            title=payload.get("title", ""),
+            body=payload.get("body", ""),
+            content_type=payload.get("content_type", "post"),
+            platform=payload.get("platform", "instagram"),
+            campaign_id=payload.get("campaign_id"),
+            hashtags=payload.get("hashtags", []),
+            scheduled_at=payload.get("scheduled_at", ""),
+        )
+
+    @app.put("/api/marketing/content/{content_id}")
+    async def marketing_update_content(content_id: int, payload: dict):
+        from core.marketing.campaigns import update_content
+        return update_content(content_id, **payload) or {"error": "Content not found"}
+
+    @app.post("/api/marketing/content/{content_id}/publish")
+    async def marketing_publish_content(content_id: int):
+        from core.marketing.campaigns import publish_content
+        return publish_content(content_id) or {"error": "Content not found"}
+
+    @app.post("/api/marketing/content/generate")
+    async def marketing_generate_content(payload: dict):
+        """AI-generated marketing content."""
+        agent = getattr(command_center, "_marketing_agent", None)
+        if not agent:
+            return {"error": "Marketing agent not initialized"}
+        topic = payload.get("topic", "")
+        platform = payload.get("platform", "instagram")
+        content_type = payload.get("content_type", "post")
+        language = payload.get("language", "ms")
+        task = f"""Generate {content_type} content for {platform} about: {topic}
+Language: {language}
+Include: headline, body, hashtags, call-to-action
+Format as JSON with keys: title, body, hashtags, cta"""
+        result = await agent.run(task)
+        return {"generated": result.get("text", ""), "agent": "marketing"}
+
+    # --- SEO ---
+    @app.get("/api/marketing/seo")
+    async def marketing_seo(url: str = ""):
+        from core.marketing.seo import get_seo_tracking
+        return {"tracking": get_seo_tracking(url=url or None)}
+
+    @app.post("/api/marketing/seo")
+    async def marketing_add_seo(payload: dict):
+        from core.marketing.seo import add_seo_tracking
+        return add_seo_tracking(
+            url=payload.get("url", ""),
+            keyword=payload.get("keyword", ""),
+            position=payload.get("position", 0),
+            search_volume=payload.get("search_volume", 0),
+            competition=payload.get("competition", ""),
+            page_score=payload.get("page_score", 0),
+        )
+
+    @app.post("/api/marketing/seo/{tracking_id}/update")
+    async def marketing_update_seo(tracking_id: int, payload: dict):
+        from core.marketing.seo import update_seo_position
+        return update_seo_position(
+            tracking_id,
+            position=payload.get("position", 0),
+            page_score=payload.get("page_score"),
+        ) or {"error": "Not found"}
+
+    @app.delete("/api/marketing/seo/{tracking_id}")
+    async def marketing_delete_seo(tracking_id: int):
+        from core.marketing.seo import delete_seo_tracking
+        return {"removed": delete_seo_tracking(tracking_id)}
+
+    @app.get("/api/marketing/seo/stats")
+    async def marketing_seo_stats():
+        from core.marketing.seo import seo_stats
+        return seo_stats()
+
+    @app.post("/api/marketing/seo/audit")
+    async def marketing_seo_audit(payload: dict):
+        """Run SEO audit on a URL."""
+        from core.tools.web_tools import seo_audit
+        import json
+        url = payload.get("url", "")
+        if not url:
+            return {"error": "No URL provided"}
+        result = json.loads(seo_audit(url))
+        return result
+
+    @app.post("/api/marketing/seo/keywords")
+    async def marketing_seo_keywords(payload: dict):
+        """Research keywords."""
+        from core.tools.web_tools import keyword_research
+        import json
+        topic = payload.get("topic", "")
+        if not topic:
+            return {"error": "No topic provided"}
+        result = json.loads(keyword_research(topic))
+        return result
+
+    @app.post("/api/marketing/seo/competitor")
+    async def marketing_seo_competitor(payload: dict):
+        """Analyze competitor website."""
+        from core.tools.web_tools import analyze_competitor
+        import json
+        url = payload.get("url", "")
+        if not url:
+            return {"error": "No URL provided"}
+        result = json.loads(analyze_competitor(url))
+        return result
+
+    # --- Invoices ---
+    @app.get("/api/marketing/invoices")
+    async def marketing_invoices(client_id: int = 0, status: str = ""):
+        from core.marketing.invoices import get_invoices
+        return {"invoices": get_invoices(client_id=client_id or None, status=status or None)}
+
+    @app.post("/api/marketing/invoices")
+    async def marketing_create_invoice(payload: dict):
+        from core.marketing.invoices import create_invoice
+        return create_invoice(
+            client_id=payload.get("client_id", 0),
+            amount=payload.get("amount", 0),
+            description=payload.get("description", ""),
+            items=payload.get("items", []),
+            tax_rate=payload.get("tax_rate", 0),
+            currency=payload.get("currency", "MYR"),
+            due_days=payload.get("due_days", 30),
+        )
+
+    @app.post("/api/marketing/invoices/{invoice_id}/pay")
+    async def marketing_pay_invoice(invoice_id: int, payload: dict):
+        from core.marketing.invoices import mark_invoice_paid
+        return mark_invoice_paid(
+            invoice_id,
+            payment_method=payload.get("method", ""),
+            payment_ref=payload.get("ref", ""),
+        ) or {"error": "Invoice not found"}
+
+    @app.delete("/api/marketing/invoices/{invoice_id}")
+    async def marketing_delete_invoice(invoice_id: int):
+        from core.marketing.invoices import delete_invoice
+        return {"removed": delete_invoice(invoice_id)}
+
+    @app.get("/api/marketing/invoices/stats")
+    async def marketing_invoice_stats():
+        from core.marketing.invoices import invoice_stats
+        return invoice_stats()
+
+    # --- Marketing Dashboard ---
+    @app.get("/api/marketing/dashboard")
+    async def marketing_dashboard():
+        from core.marketing.leads import lead_stats
+        from core.marketing.clients import client_stats
+        from core.marketing.campaigns import campaign_stats
+        from core.marketing.seo import seo_stats
+        from core.marketing.invoices import invoice_stats
+        from core.marketing.clients import get_activity_log
+        return {
+            "leads": lead_stats(),
+            "clients": client_stats(),
+            "campaigns": campaign_stats(),
+            "seo": seo_stats(),
+            "invoices": invoice_stats(),
+            "activity": get_activity_log(10),
+        }
+
+    @app.post("/api/marketing/chat")
+    async def marketing_chat(payload: dict):
+        """Chat with marketing agent."""
+        agent = getattr(command_center, "_marketing_agent", None)
+        if not agent:
+            return {"error": "Marketing agent not initialized"}
+        message = payload.get("message", "")
+        result = await agent.run(message)
+        return {"response": result.get("text", ""), "tools_used": result.get("tools_used", [])}
+
+    # ============================================================
     # OS Kernel endpoints
     # ============================================================
 

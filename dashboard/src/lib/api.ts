@@ -624,6 +624,169 @@ export async function updateNotificationRouting(routing: Record<string, string[]
 }
 
 // ============================================================
+// Marketing System
+// ============================================================
+
+export interface Lead {
+  id: number; name: string; email: string; phone: string; company: string
+  source: string; status: string; score: number; notes: string; tags: string[]
+  assigned_to: string | null; created_at: string; updated_at: string
+}
+
+export interface Client {
+  id: number; lead_id: number | null; name: string; email: string; phone: string
+  company: string; address: string; status: string; tier: string
+  total_paid: number; total_invoiced: number; notes: string; tags: string[]
+  whatsapp_verified: number; email_verified: number; created_at: string
+}
+
+export interface Campaign {
+  id: number; name: string; description: string; type: string; status: string
+  budget: number; spent: number; target_audience: string; channels: string[]
+  start_date: string; end_date: string; metrics: Record<string, any>; created_at: string
+}
+
+export interface Content {
+  id: number; campaign_id: number | null; title: string; body: string
+  content_type: string; platform: string; status: string; scheduled_at: string
+  published_at: string; hashtags: string[]; created_at: string
+}
+
+export interface Invoice {
+  id: number; invoice_number: string; client_id: number; amount: number
+  currency: string; status: string; description: string; items: any[]
+  tax_rate: number; tax_amount: number; total: number; due_date: string
+  paid_at: string | null; payment_method: string; created_at: string
+}
+
+// Leads
+export async function getLeads(status?: string, q?: string): Promise<{ leads: Lead[] }> {
+  const p = new URLSearchParams(); if (status) p.set('status', status); if (q) p.set('q', q)
+  const res = await fetch(`${API_BASE}/marketing/leads?${p}`); return res.json()
+}
+export async function createLead(data: Partial<Lead>): Promise<Lead> {
+  const res = await fetch(`${API_BASE}/marketing/leads`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function updateLead(id: number, data: Partial<Lead>): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/leads/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function deleteLead(id: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/leads/${id}`, { method: 'DELETE' }); return res.json()
+}
+export async function convertLead(id: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/leads/${id}/convert`, { method: 'POST' }); return res.json()
+}
+export async function scoreLead(id: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/leads/${id}/score`, { method: 'POST' }); return res.json()
+}
+export async function getLeadStats(): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/leads/stats`); return res.json()
+}
+
+// Clients
+export async function getClients(status?: string, tier?: string, q?: string): Promise<{ clients: Client[] }> {
+  const p = new URLSearchParams(); if (status) p.set('status', status); if (tier) p.set('tier', tier); if (q) p.set('q', q)
+  const res = await fetch(`${API_BASE}/marketing/clients?${p}`); return res.json()
+}
+export async function createClient(data: Partial<Client>): Promise<Client> {
+  const res = await fetch(`${API_BASE}/marketing/clients`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function updateClient(id: number, data: Partial<Client>): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/clients/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function deleteClient(id: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/clients/${id}`, { method: 'DELETE' }); return res.json()
+}
+export async function getClientStats(): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/clients/stats`); return res.json()
+}
+export async function approveClient(clientId: number, data: { type: string; ref_id?: number; message: string; channels?: string[] }): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/clients/${clientId}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+
+// Approvals
+export async function getApprovalsMarketing(): Promise<{ pending: any[] }> {
+  const res = await fetch(`${API_BASE}/marketing/approvals`); return res.json()
+}
+export async function respondApproval(approvalId: number, data: { response: string; approved: boolean }): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/approvals/${approvalId}/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+
+// Campaigns
+export async function getCampaigns(status?: string): Promise<{ campaigns: Campaign[] }> {
+  const p = new URLSearchParams(); if (status) p.set('status', status)
+  const res = await fetch(`${API_BASE}/marketing/campaigns?${p}`); return res.json()
+}
+export async function createCampaign(data: Partial<Campaign>): Promise<Campaign> {
+  const res = await fetch(`${API_BASE}/marketing/campaigns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function updateCampaign(id: number, data: Partial<Campaign>): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/campaigns/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function deleteCampaign(id: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/campaigns/${id}`, { method: 'DELETE' }); return res.json()
+}
+
+// Content
+export async function getContent(status?: string, platform?: string): Promise<{ content: Content[] }> {
+  const p = new URLSearchParams(); if (status) p.set('status', status); if (platform) p.set('platform', platform)
+  const res = await fetch(`${API_BASE}/marketing/content?${p}`); return res.json()
+}
+export async function createContent(data: Partial<Content>): Promise<Content> {
+  const res = await fetch(`${API_BASE}/marketing/content`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function updateContent(id: number, data: Partial<Content>): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/content/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function publishContent(id: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/content/${id}/publish`, { method: 'POST' }); return res.json()
+}
+export async function generateContent(data: { topic: string; platform?: string; content_type?: string; language?: string }): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/content/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+
+// SEO
+export async function getSeoTracking(url?: string): Promise<{ tracking: any[] }> {
+  const p = new URLSearchParams(); if (url) p.set('url', url)
+  const res = await fetch(`${API_BASE}/marketing/seo?${p}`); return res.json()
+}
+export async function addSeoTracking(data: any): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/seo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function seoAudit(url: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/seo/audit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }); return res.json()
+}
+export async function keywordResearch(topic: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/seo/keywords`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic }) }); return res.json()
+}
+export async function competitorAnalysis(url: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/seo/competitor`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }); return res.json()
+}
+
+// Invoices
+export async function getInvoices(clientId?: number, status?: string): Promise<{ invoices: Invoice[] }> {
+  const p = new URLSearchParams(); if (clientId) p.set('client_id', String(clientId)); if (status) p.set('status', status)
+  const res = await fetch(`${API_BASE}/marketing/invoices?${p}`); return res.json()
+}
+export async function createInvoice(data: Partial<Invoice> & { client_id: number; amount: number }): Promise<Invoice> {
+  const res = await fetch(`${API_BASE}/marketing/invoices`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function payInvoice(id: number, data: { method: string; ref?: string }): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/invoices/${id}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); return res.json()
+}
+export async function deleteInvoice(id: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/invoices/${id}`, { method: 'DELETE' }); return res.json()
+}
+
+// Marketing Dashboard
+export async function getMarketingDashboard(): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/dashboard`); return res.json()
+}
+export async function marketingChat(message: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/marketing/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) }); return res.json()
+}
+
+// ============================================================
 // OS Kernel
 // ============================================================
 
