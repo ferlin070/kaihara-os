@@ -14,6 +14,8 @@ export default function GoalsTracker() {
       }
     }
     fetchGoals()
+    const interval = setInterval(fetchGoals, 60000) // Refresh every 60s
+    return () => clearInterval(interval)
   }, [])
 
   const statusIcon: Record<string, string> = {
@@ -28,6 +30,10 @@ export default function GoalsTracker() {
     low: 'text-kaihara-muted',
   }
 
+  const done = goals.filter(g => g.status === 'done').length
+  const total = goals.length
+  const pct = total > 0 ? (done / total) * 100 : 0
+
   if (goals.length === 0) {
     return (
       <div className="hud-panel">
@@ -40,6 +46,21 @@ export default function GoalsTracker() {
   return (
     <div className="hud-panel">
       <div className="hud-title">Today's Goals</div>
+
+      {/* Progress summary */}
+      <div className="mb-2">
+        <div className="flex justify-between text-xs mb-1">
+          <span className="text-kaihara-muted">{done}/{total} completed</span>
+          <span className="text-kaihara-accent font-mono">{Math.round(pct)}%</span>
+        </div>
+        <div className="w-full h-1.5 bg-kaihara-border rounded overflow-hidden">
+          <div
+            className="h-full bg-kaihara-accent transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
       <div className="space-y-1.5">
         {goals.map((goal, i) => (
           <div key={i} className="flex items-center gap-2 text-xs">

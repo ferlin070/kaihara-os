@@ -10,6 +10,7 @@ import TaskBoard from './components/TaskBoard'
 import SkillBrowser from './components/SkillBrowser'
 import SecurityView from './components/SecurityView'
 import DaemonView from './components/DaemonView'
+import PendingApprovals from './components/PendingApprovals'
 import ChannelStatus from './components/ChannelStatus'
 import KernelStatus from './components/KernelStatus'
 import MetaPanel from './components/MetaPanel'
@@ -224,6 +225,7 @@ export default function App() {
         {/* Right Sidebar — scroll dalam diri sendiri */}
         <aside className="w-72 flex-shrink-0 border-l border-kaihara-border p-3 overflow-y-auto space-y-3">
           <MorningBriefing />
+          <PendingApprovals />
           <GoalsTracker />
           <NotificationPanel notifications={notifications} />
         </aside>
