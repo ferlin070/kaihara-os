@@ -5,8 +5,19 @@ Loads SOUL.md identity, connects to memory, model router, tools.
 
 import os
 import re
+import json
 from pathlib import Path
 from typing import Any
+
+from core.tools.web_tools import web_search, scrape_website, search_places
+
+# Tasks matching these patterns get live web data injected
+WEB_TRIGGER = re.compile(
+    r"\b(cari|mencari|search|scrape|senarai|list|telefon|no\.|nombor|alamat|"
+    r"address|email|emel|kedai|restoran|restaurant|bakery|perniagaan|"
+    r"business|syarikat|company|pasaran|market|pesaing|competitor|"
+    r"berita|news|harga|price|trend|review|google maps|maps)\b", re.I)
+WEB_AGENTS = {"marketing", "research", "kaihara"}
 
 
 class BaseAgent:
@@ -101,16 +112,52 @@ class GenericAgent(BaseAgent):
                          token_juice=token_juice,
                          approval_gate=approval_gate)
 
+    @staticmethod
+    def _gather_web_context(task: str) -> str:
+        """Fetch live web data relevant to the task (RAG-lite)."""
+        parts = []
+        try:
+            search = json.loads(web_search(task[:150], 6))
+            results = search.get("results", [])
+            if results:
+                lines = [f"- {r['title']} | {r['url']}\n  {r['snippet']}"
+                         for r in results]
+                parts.append("[REAL-TIME WEB SEARCH RESULTS]\n"
+                             + "\n".join(lines))
+        except Exception:
+            pass
+        try:
+            places = json.loads(search_places(task[:120], 8))
+            pr = places.get("results", [])
+            if pr:
+                plines = []
+                for p in pr[:8]:
+                    bits = [p.get("name", ""), p.get("address", ""),
+                            p.get("snippet", "")]
+                    plines.append("- " + " | ".join(b for b in bits if b))
+                parts.append("[PLACE/BUSINESS DATA]\n" + "\n".join(plines))
+        except Exception:
+            pass
+        return "\n\n".join(parts)
+
     async def run(self, task: str, context: dict | None = None) -> dict:
-        """Execute task using SOUL.md personality."""
+        """Execute task using SOUL.md personality + live web tools."""
         try:
             # Build context from memory if available
             memory_context = ""
             if self.memory:
                 memory_context = self.memory.super_context(task)
 
+            # Live web injection for research/marketing tasks
+            web_context = ""
+            if self.AGENT_TYPE in WEB_AGENTS and WEB_TRIGGER.search(task):
+                web_context = self._gather_web_context(task)
+
+            full_context = "\n\n".join(
+                x for x in (memory_context, web_context) if x)
+
             # Use think() which applies SOUL.md as system prompt
-            response = await self.think(task, context=memory_context)
+            response = await self.think(task, context=full_context)
 
             # Store result in memory
             if self.memory:
@@ -123,6 +170,7 @@ class GenericAgent(BaseAgent):
             return {
                 "agent": self.AGENT_TYPE,
                 "text": response,
+                "web_used": bool(web_context),
                 "status": "ok"
             }
         except Exception as e:
