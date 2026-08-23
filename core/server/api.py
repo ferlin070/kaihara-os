@@ -928,6 +928,38 @@ def create_app(command_center) -> FastAPI:
         return await mgr.send_to_channel(name, recipient, text)
 
     # ============================================================
+    # Notification Service endpoints
+    # ============================================================
+
+    @app.get("/api/notifications/status")
+    async def notification_status():
+        svc = getattr(command_center, "_notification_service", None)
+        if not svc:
+            return {"error": "Notification service not initialized"}
+        return svc.status()
+
+    @app.post("/api/notifications/send")
+    async def notification_send(payload: dict):
+        svc = getattr(command_center, "_notification_service", None)
+        if not svc:
+            return {"error": "Notification service not initialized"}
+        return await svc.send(
+            message=payload.get("message", ""),
+            priority=payload.get("priority", "normal"),
+            title=payload.get("title", ""),
+            channels=payload.get("channels"),
+            recipient=payload.get("recipient"),
+            quiet_ok=payload.get("quiet_ok", False),
+        )
+
+    @app.post("/api/notifications/routing")
+    async def notification_routing(payload: dict):
+        svc = getattr(command_center, "_notification_service", None)
+        if not svc:
+            return {"error": "Notification service not initialized"}
+        return svc.update_routing(payload.get("routing", {}))
+
+    # ============================================================
     # OS Kernel endpoints
     # ============================================================
 

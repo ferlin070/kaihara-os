@@ -589,6 +589,41 @@ export async function stopChannel(name: string): Promise<any> {
 }
 
 // ============================================================
+// Notifications
+// ============================================================
+
+export interface NotificationStatus {
+  quiet_hours: boolean
+  rate_limit: { max_per_hour: number; sent_this_hour: number; remaining: number }
+  routing: Record<string, string[]>
+  history_count: number
+  last_5: any[]
+}
+
+export async function getNotificationStatus(): Promise<NotificationStatus> {
+  const res = await fetch(`${API_BASE}/notifications/status`)
+  return res.json()
+}
+
+export async function sendNotification(message: string, priority = 'normal', title = '', channels?: string[]): Promise<any> {
+  const res = await fetch(`${API_BASE}/notifications/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, priority, title, channels }),
+  })
+  return res.json()
+}
+
+export async function updateNotificationRouting(routing: Record<string, string[]>): Promise<any> {
+  const res = await fetch(`${API_BASE}/notifications/routing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ routing }),
+  })
+  return res.json()
+}
+
+// ============================================================
 // OS Kernel
 // ============================================================
 

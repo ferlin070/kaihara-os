@@ -129,6 +129,13 @@ def init_kaihara() -> CommandCenter:
     from core.channels.manager import ChannelManager
     cc._channel_manager = ChannelManager(config, command_center=cc)
 
+    # Notification Service (multi-channel dispatch)
+    from core.channels.notification_service import NotificationService
+    cc._notification_service = NotificationService(
+        cc._channel_manager,
+        config.get("notification", {})
+    )
+
     # OS Kernel
     from core.os.kernel import KernelManager
     cc._kernel = KernelManager(config, audit=cc._audit)
