@@ -130,3 +130,77 @@ class SkillRegistry:
             "categories": cats,
             "installed": len(skills),
         }
+
+    # ============================================================
+    # Prompt Storage
+    # ============================================================
+
+    def _prompts_path(self) -> Path:
+        return self.skills_dir / "prompts.json"
+
+    def _load_prompts(self) -> dict:
+        path = self._prompts_path()
+        if not path.exists():
+            return {"prompts": []}
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+
+    def _save_prompts(self, data: dict):
+        path = self._prompts_path()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def list_prompts(self, category: str = None,
+                     query: str = None) -> list[dict]:
+        """List all saved prompts with optional filters."""
+        data = self._load_prompts()
+        prompts = data.get("prompts", [])
+        if category:
+            prompts = [p for p in prompts if p.get("category") == category]
+        if query:
+            q = query.lower()
+            prompts = [p for p in prompts
+                       if q in p.get("name", "").lower()
+                       or q in p.get("content", "").lower()
+                       or any(q in t.lower() for t in p.get("tags", []))]
+        return prompts
+
+    def save_prompt(self, name: str, content: str, category: str = "general",
+                    tags: list[str] = None, description: str = "") -> dict:
+        """Save a new prompt."""
+        import hashlib
+        prompt_id = f"prompt_{hashlib.sha256(name.encode()).hexdigest()[:10]}"
+        entry = {
+            "id": prompt_id,
+            "name": name,
+            "content": content,
+            "category": category,
+            "tags": tags or [],
+            "description": description,
+            "uses": 0,
+            "created_at": datetime.now().isoformat(),
+        }
+        data = self._load_prompts()
+        data["prompts"].append(entry)
+        self._save_prompts(data)
+        return {"prompt_id": prompt_id, "status": "saved"}
+
+    def delete_prompt(self, prompt_id: str) -> bool:
+        """Delete a saved prompt."""
+        data = self._load_prompts()
+        before = len(data["prompts"])
+        data["prompts"] = [p for p in data["prompts"] if p["id"] != prompt_id]
+        if len(data["prompts"]) < before:
+            self._save_prompts(data)
+            return True
+        return False
+
+    def use_prompt(self, prompt_id: str) -> dict:
+        """Mark a prompt as used (increment counter)."""
+        data = self._load_prompts()
+        for p in data["prompts"]:
+            if p["id"] == prompt_id:
+                p["uses"] = p.get("uses", 0) + 1
+                self._save_prompts(data)
+                return {"prompt_id": prompt_id, "uses": p["uses"]}
+        return {"error": "Prompt not found"}

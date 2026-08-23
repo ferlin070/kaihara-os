@@ -302,6 +302,69 @@ export async function createSkill(description: string): Promise<any> {
 }
 
 // ============================================================
+// Prompt Storage
+// ============================================================
+
+export interface Prompt {
+  id: string
+  name: string
+  content: string
+  category: string
+  tags: string[]
+  description: string
+  uses: number
+  created_at: string
+}
+
+export async function getPrompts(category?: string, q?: string): Promise<{ prompts: Prompt[] }> {
+  const params = new URLSearchParams()
+  if (category) params.set('category', category)
+  if (q) params.set('q', q)
+  const res = await fetch(`${API_BASE}/prompts?${params}`)
+  return res.json()
+}
+
+export async function savePrompt(name: string, content: string, category = 'general', tags: string[] = [], description = ''): Promise<any> {
+  const res = await fetch(`${API_BASE}/prompts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content, category, tags, description }),
+  })
+  return res.json()
+}
+
+export async function deletePrompt(promptId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/prompts/${promptId}`, { method: 'DELETE' })
+  return res.json()
+}
+
+export async function usePrompt(promptId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/prompts/${promptId}/use`, { method: 'POST' })
+  return res.json()
+}
+
+// ============================================================
+// Repo Skill Extraction
+// ============================================================
+
+export interface ExtractResult {
+  repo: string
+  found: number
+  installed: number
+  skills: { id: string; path: string; name: string }[]
+  error?: string
+}
+
+export async function extractRepoSkills(repoUrl: string): Promise<ExtractResult> {
+  const res = await fetch(`${API_BASE}/skills/extract-repo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repo_url: repoUrl }),
+  })
+  return res.json()
+}
+
+// ============================================================
 // Voice
 // ============================================================
 

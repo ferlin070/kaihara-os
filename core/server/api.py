@@ -452,6 +452,177 @@ def create_app(command_center) -> FastAPI:
         return {"removed": success, "skill_id": skill_id}
 
     # ============================================================
+    # Prompt Storage endpoints
+    # ============================================================
+
+    @app.get("/api/prompts")
+    async def list_prompts(category: str = "", q: str = ""):
+        """List all saved prompts."""
+        registry = getattr(command_center, "_skill_registry", None)
+        if not registry:
+            return {"error": "Skill registry not initialized"}
+        prompts = registry.list_prompts(category=category or None, query=q or None)
+        return {"prompts": prompts}
+
+    @app.post("/api/prompts")
+    async def save_prompt(payload: dict):
+        """Save a new prompt."""
+        registry = getattr(command_center, "_skill_registry", None)
+        if not registry:
+            return {"error": "Skill registry not initialized"}
+        result = registry.save_prompt(
+            name=payload.get("name", ""),
+            content=payload.get("content", ""),
+            category=payload.get("category", "general"),
+            tags=payload.get("tags", []),
+            description=payload.get("description", ""),
+        )
+        return result
+
+    @app.delete("/api/prompts/{prompt_id}")
+    async def delete_prompt(prompt_id: str):
+        """Delete a saved prompt."""
+        registry = getattr(command_center, "_skill_registry", None)
+        if not registry:
+            return {"error": "Skill registry not initialized"}
+        success = registry.delete_prompt(prompt_id)
+        return {"removed": success, "prompt_id": prompt_id}
+
+    @app.post("/api/prompts/{prompt_id}/use")
+    async def use_prompt(prompt_id: str):
+        """Mark a prompt as used (increment counter)."""
+        registry = getattr(command_center, "_skill_registry", None)
+        if not registry:
+            return {"error": "Skill registry not initialized"}
+        result = registry.use_prompt(prompt_id)
+        return result
+
+    # ============================================================
+    # Repo Skill Extraction endpoints
+    # ============================================================
+
+    @app.post("/api/skills/extract-repo")
+    async def extract_repo_skills(payload: dict):
+        """Extract SKILL.md files from a GitHub repo."""
+        import httpx
+        repo_url = payload.get("repo_url", "")
+        if not repo_url:
+            return {"error": "No repo URL provided"}
+
+        # Parse GitHub URL
+        # Handle: https://github.com/owner/repo or owner/repo
+        repo_url = repo_url.strip().rstrip("/")
+        if "github.com/" in repo_url:
+            parts = repo_url.split("github.com/")[-1].split("/")
+            if len(parts) < 2:
+                return {"error": "Invalid GitHub URL format"}
+            owner, repo = parts[0], parts[1]
+        else:
+            parts = repo_url.split("/")
+            if len(parts) != 2:
+                return {"error": "Format: owner/repo or full GitHub URL"}
+            owner, repo = parts[0], parts[1]
+
+        # Fetch repo tree via GitHub API
+        try:
+            async with httpx.AsyncClient() as client:
+                # Get default branch
+                resp = await client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}",
+                    timeout=10
+                )
+                if resp.status_code != 200:
+                    return {"error": f"Repository not found: {owner}/{repo}"}
+                default_branch = resp.json().get("default_branch", "main")
+
+                # Get file tree
+                resp = await client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/git/trees/{default_branch}?recursive=1",
+                    timeout=15
+                )
+                if resp.status_code != 200:
+                    return {"error": "Could not fetch repo tree"}
+
+                tree = resp.json().get("tree", [])
+
+                # Find SKILL.md files
+                skill_files = []
+                for item in tree:
+                    path = item.get("path", "")
+                    if path.endswith(".md") and ("skill" in path.lower() or "SKILL" in path):
+                        skill_files.append(path)
+                    elif path.endswith("/SKILL.md"):
+                        skill_files.append(path)
+
+                if not skill_files:
+                    # Also look for any .md files that might be skills
+                    md_files = [item.get("path", "") for item in tree if item.get("path", "").endswith(".md")]
+                    # Filter for likely skill files
+                    skill_keywords = ["skill", "guide", "instruction", "pattern", "workflow"]
+                    for md in md_files:
+                        filename = md.split("/")[-1].lower()
+                        if any(kw in filename for kw in skill_keywords):
+                            skill_files.append(md)
+
+                if not skill_files:
+                    return {"error": "No skill files found in repository", "total_files": len(tree)}
+
+                # Download and install each skill
+                installed = []
+                for skill_path in skill_files[:10]:  # Max 10 skills
+                    try:
+                        resp = await client.get(
+                            f"https://api.github.com/repos/{owner}/{repo}/contents/{skill_path}",
+                            timeout=10
+                        )
+                        if resp.status_code == 200:
+                            import base64
+                            content = base64.b64decode(resp.json().get("content", "")).decode("utf-8")
+
+                            # Generate skill ID from filename
+                            filename = skill_path.split("/")[-1].replace(".md", "")
+                            skill_id = f"{repo}-{filename}".lower().replace(" ", "-")
+
+                            # Install skill
+                            registry = getattr(command_center, "_skill_registry", None)
+                            if registry:
+                                # Parse metadata from content
+                                import re
+                                metadata = {"name": filename, "description": f"From {owner}/{repo}"}
+                                frontmatter = re.search(r"^---\n(.*?)\n---", content, re.DOTALL)
+                                if frontmatter:
+                                    for line in frontmatter.group(1).split("\n"):
+                                        if ":" in line:
+                                            key, val = line.split(":", 1)
+                                            key = key.strip().lower()
+                                            val = val.strip()
+                                            if key in ("name", "description", "category", "tags", "version"):
+                                                if val.startswith("["):
+                                                    val = [v.strip() for v in val[1:-1].split(",")]
+                                                metadata[key] = val
+
+                                registry.install_skill(skill_id, content, {
+                                    **metadata,
+                                    "source": f"github:{owner}/{repo}",
+                                    "version": metadata.get("version", "1.0.0"),
+                                })
+                                installed.append({"id": skill_id, "path": skill_path, "name": metadata.get("name", filename)})
+                    except Exception as e:
+                        continue
+
+                return {
+                    "repo": f"{owner}/{repo}",
+                    "found": len(skill_files),
+                    "installed": len(installed),
+                    "skills": installed,
+                }
+
+        except httpx.TimeoutException:
+            return {"error": "GitHub API timeout. Try again."}
+        except Exception as e:
+            return {"error": f"Extraction failed: {str(e)}"}
+
+    # ============================================================
     # Voice endpoints
     # ============================================================
 
