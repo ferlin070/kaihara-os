@@ -14,6 +14,7 @@ import KernelStatus from './components/KernelStatus'
 import MetaPanel from './components/MetaPanel'
 import AgentMap from './components/AgentMap'
 import ChatSessions from './components/ChatSessions'
+import MemoryTree from './components/MemoryTree'
 import {
   getStatus, sendMessage, getMapState, getChatHistory,
   getConversations, newConversation, renameConversation, deleteConversation,
@@ -214,7 +215,7 @@ export default function App() {
             {activeTab === 'tasks' && <TaskBoard />}
             {activeTab === 'skills' && <SkillBrowser />}
             {activeTab === 'security' && <SecurityView />}
-            {activeTab === 'memory' && <MemoryView />}
+            {activeTab === 'memory' && <MemoryTree />}
           </div>
         </main>
 
@@ -229,14 +230,3 @@ export default function App() {
   )
 }
 
-function MemoryView() {
-  return (
-    <div className="flex-1 p-6 overflow-y-auto">
-      <h2 className="hud-title">Memory Tree</h2>
-      <div className="hud-panel">
-        <p className="text-kaihara-muted text-sm">Memory viewer — search and browse stored memories.</p>
-        <p className="text-kaihara-muted text-xs mt-2">Use /api/memory/recall?q=your_query to search.</p>
-      </div>
-    </div>
-  )
-}

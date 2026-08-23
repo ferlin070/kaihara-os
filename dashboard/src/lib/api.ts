@@ -44,6 +44,21 @@ export interface MemoryResult {
   topic: string
   tags: string[]
   score: number
+  tier?: string
+  raw_content?: string
+  mermaid?: string
+}
+
+export interface MemoryStats {
+  total_memories: number
+  raw_count: number
+  summary_count: number
+  canvas_count: number
+  topics: Record<string, number>
+  daily_count: number
+  goals_count: number
+  vector_available: boolean
+  vector_count: number
 }
 
 export async function getStatus(): Promise<SystemStatus> {
@@ -126,6 +141,24 @@ export async function clearChatHistory(convId = 'dashboard'): Promise<any> {
 
 export async function recallMemory(q: string, limit = 5): Promise<{ results: MemoryResult[] }> {
   const res = await fetch(`${API_BASE}/memory/recall?q=${encodeURIComponent(q)}&limit=${limit}`)
+  return res.json()
+}
+
+export async function getMemoryStats(): Promise<MemoryStats> {
+  const res = await fetch(`${API_BASE}/memory/stats`)
+  return res.json()
+}
+
+export async function getMemoryBrowse(topic?: string, limit = 50): Promise<{ results: MemoryResult[] }> {
+  const params = new URLSearchParams()
+  if (topic) params.set('topic', topic)
+  params.set('limit', String(limit))
+  const res = await fetch(`${API_BASE}/memory/browse?${params}`)
+  return res.json()
+}
+
+export async function deleteMemory(summaryId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/memory/${summaryId}`, { method: 'DELETE' })
   return res.json()
 }
 

@@ -108,6 +108,112 @@ def create_app(command_center) -> FastAPI:
         return {"conv_id": conv_id,
                 "context": command_center.memory.get_context(conv_id)}
 
+    @app.get("/api/memory/stats")
+    async def memory_stats():
+        """Get memory system statistics."""
+        if not command_center.memory:
+            return {"error": "memory not initialized"}
+        mem = command_center.memory
+        try:
+            raw_count = mem.conn.execute("SELECT COUNT(*) FROM raw").fetchone()[0]
+            summary_count = mem.conn.execute("SELECT COUNT(*) FROM summary").fetchone()[0]
+            canvas_count = mem.conn.execute("SELECT COUNT(*) FROM canvas").fetchone()[0]
+            daily_count = mem.conn.execute("SELECT COUNT(*) FROM daily_memory").fetchone()[0]
+            goals_count = mem.conn.execute("SELECT COUNT(*) FROM goals WHERE status='active'").fetchone()[0]
+            # Topic distribution
+            topic_rows = mem.conn.execute(
+                "SELECT topic, COUNT(*) as cnt FROM summary GROUP BY topic ORDER BY cnt DESC"
+            ).fetchall()
+            topics = {r["topic"]: r["cnt"] for r in topic_rows}
+            # Vector DB stats
+            vector_available = mem.collection is not None
+            vector_count = 0
+            if vector_available:
+                try:
+                    vector_count = mem.collection.count()
+                except Exception:
+                    vector_count = 0
+            return {
+                "total_memories": summary_count,
+                "raw_count": raw_count,
+                "summary_count": summary_count,
+                "canvas_count": canvas_count,
+                "topics": topics,
+                "daily_count": daily_count,
+                "goals_count": goals_count,
+                "vector_available": vector_available,
+                "vector_count": vector_count,
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    @app.get("/api/memory/browse")
+    async def memory_browse(topic: str = "", limit: int = 50):
+        """Browse memories by topic."""
+        if not command_center.memory:
+            return {"error": "memory not initialized"}
+        mem = command_center.memory
+        try:
+            if topic:
+                rows = mem.conn.execute(
+                    "SELECT s.id, s.content, s.topic, s.tags, s.importance, "
+                    "c.mermaid, c.symbols "
+                    "FROM summary s LEFT JOIN canvas c ON s.id = c.summary_id "
+                    "WHERE s.topic = ? ORDER BY s.timestamp DESC LIMIT ?",
+                    (topic, limit)
+                ).fetchall()
+            else:
+                rows = mem.conn.execute(
+                    "SELECT s.id, s.content, s.topic, s.tags, s.importance, "
+                    "c.mermaid, c.symbols "
+                    "FROM summary s LEFT JOIN canvas c ON s.id = c.summary_id "
+                    "ORDER BY s.timestamp DESC LIMIT ?",
+                    (limit,)
+                ).fetchall()
+            results = []
+            for r in rows:
+                results.append({
+                    "summary_id": r["id"],
+                    "content": r["content"],
+                    "topic": r["topic"],
+                    "tags": json.loads(r["tags"]) if r["tags"] else [],
+                    "score": 1.0,
+                    "tier": "summary",
+                    "mermaid": r["mermaid"] or "",
+                })
+            return {"results": results}
+        except Exception as e:
+            return {"error": str(e)}
+
+    @app.delete("/api/memory/{summary_id}")
+    async def delete_memory(summary_id: str):
+        """Delete a memory by summary_id."""
+        if not command_center.memory:
+            return {"error": "memory not initialized"}
+        mem = command_center.memory
+        try:
+            # Get raw_id before deleting
+            row = mem.conn.execute(
+                "SELECT raw_id FROM summary WHERE id = ?", (summary_id,)
+            ).fetchone()
+            if not row:
+                return {"error": "not_found"}
+            raw_id = row["raw_id"]
+            # Delete from all tiers
+            mem.conn.execute("DELETE FROM canvas WHERE summary_id = ?", (summary_id,))
+            mem.conn.execute("DELETE FROM summary WHERE id = ?", (summary_id,))
+            mem.conn.execute("DELETE FROM raw WHERE id = ?", (raw_id,))
+            # Delete from vector DB
+            if mem.collection:
+                try:
+                    mem.collection.delete(ids=[summary_id])
+                except Exception:
+                    pass
+            mem.conn.commit()
+            return {"status": "deleted", "summary_id": summary_id}
+        except Exception as e:
+            return {"error": str(e)}
+
     @app.get("/api/chat/history")
     async def chat_history(conv_id: str = "dashboard", limit: int = 100):
         """Persistent chat history (survives refresh & restart)."""
