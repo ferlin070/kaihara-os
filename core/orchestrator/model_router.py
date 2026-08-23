@@ -142,13 +142,18 @@ class ModelRouter:
             "deepseek": "DEEPSEEK_API_KEY",
             "groq": "GROQ_API_KEY",
             "9router": "NINE_ROUTER_API_KEY",
+            "opencode-zen": "OPENCODE_ZEN_API_KEY",
         }
         env_var = env_map.get(provider, f"{provider.upper()}_API_KEY")
         return os.environ.get(env_var)
 
     async def _call_ollama(self, base_url: str, model: str,
                            system: str, messages: list[dict]) -> str:
-        url = f"{base_url}/api/chat"
+        # Normalize: support both bare host and /v1-suffixed URLs
+        clean = base_url.rstrip("/")
+        if clean.endswith("/v1"):
+            clean = clean[:-3]
+        url = f"{clean}/api/chat"
         payload = {
             "model": model,
             "messages": [{"role": "system", "content": system}] + messages,
@@ -162,7 +167,7 @@ class ModelRouter:
                 content = data.get("message", {}).get("content", "")
                 if content:
                     return content
-                return f"[Ollama returned empty response]"
+                return "[Ollama returned empty response]"
         except httpx.ConnectError:
             return f"[Ollama not running at {base_url}. Start with: ollama serve]"
         except Exception as e:
