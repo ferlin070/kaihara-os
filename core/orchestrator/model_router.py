@@ -62,16 +62,42 @@ class ModelRouter:
         api_key = provider_config.get("api_key") or self._get_api_key(provider)
         api_key_header = provider_config.get("api_key_header", "Authorization")
 
-        if provider == "ollama" or (base_url and "11434" in base_url):
-            return await self._call_ollama(
+        # Local models are free — no cost tracking needed
+        is_local = provider == "ollama" or (base_url and "11434" in base_url)
+        input_tokens = sum(len(m.get("content", "")) // 4 for m in messages)
+        input_tokens += len(system) // 4
+
+        if is_local:
+            result = await self._call_ollama(
                 base_url or "http://localhost:11434",
                 model_name, system, messages
             )
-        return await self._call_openai_compat(
+            self._record_cost(provider, model_name,
+                              input_tokens, len(result) // 4, 0.0)
+            return result
+
+        result = await self._call_openai_compat(
             base_url or "https://api.openai.com/v1",
             api_key, model_name, system, messages,
             api_key_header
         )
+        # Rough cost estimate ($3/M input, $15/M output as baseline)
+        output_tokens = len(result) // 4
+        est_cost = (input_tokens * 3 + output_tokens * 15) / 1_000_000
+        self._record_cost(provider, model_name,
+                          input_tokens, output_tokens, est_cost)
+        return result
+
+    def _record_cost(self, provider: str, model: str,
+                     input_tokens: int, output_tokens: int, cost: float):
+        """Record usage to cost agent if available."""
+        try:
+            cost_agent = getattr(self, "_cost_agent", None)
+            if cost_agent:
+                cost_agent.record_usage(provider, model,
+                                        input_tokens, output_tokens, cost)
+        except Exception:
+            pass
 
     def _get_api_key(self, provider: str) -> str | None:
         env_map = {

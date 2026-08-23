@@ -364,23 +364,35 @@ class MemoryTree:
     def deep_dream(self):
         """Nightly distillation: compress daily memories, update knowledge graph."""
         today = date.today().isoformat()
+        # Track distilled raw ids to avoid re-processing
+        self.conn.execute(
+            """CREATE TABLE IF NOT EXISTS deep_dream_log (
+                raw_id TEXT PRIMARY KEY,
+                distilled_at TEXT NOT NULL
+            )"""
+        )
         rows = self.conn.execute(
             "SELECT * FROM raw WHERE date(timestamp) = ? AND "
-            "id NOT IN (SELECT raw_id FROM daily_memory)",
+            "id NOT IN (SELECT raw_id FROM deep_dream_log)",
             (today,)
         ).fetchall()
         if not rows:
             return {"distilled": 0, "date": today}
         summary_parts = []
+        now_iso = datetime.now().isoformat()
         for r in rows:
             summary_parts.append(f"- [{r['source']}] {r['content'][:100]}")
+            self.conn.execute(
+                "INSERT OR REPLACE INTO deep_dream_log VALUES (?,?)",
+                (r["id"], now_iso)
+            )
         distilled = f"# Daily Memory — {today}\n\n" + "\n".join(summary_parts)
         mem_id = f"daily_{today}_{hashlib.sha256(distilled.encode()).hexdigest()[:8]}"
         self.conn.execute(
             "INSERT OR REPLACE INTO daily_memory VALUES (?,?,?,?,?)",
-            (mem_id, today, distilled, True, datetime.now().isoformat())
+            (mem_id, today, distilled, True, now_iso)
         )
-        self._sync_to_vault(distilled, "daily", ["distilled"], datetime.now().isoformat())
+        self._sync_to_vault(distilled, "daily", ["distilled"], now_iso)
         self.conn.commit()
         return {"distilled": len(rows), "date": today, "id": mem_id}
 

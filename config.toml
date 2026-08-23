@@ -167,7 +167,9 @@ port = 7000
 # ============================================================
 
 [voice]
-enabled = false
+enabled = true
+piper_path = "/opt/piper/piper"
+tts_voice = "/opt/piper/voices/en_US-lessac-medium.onnx"
 
 # ============================================================
 #  INFRASTRUCTURE

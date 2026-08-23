@@ -140,6 +140,12 @@ def init_kaihara() -> CommandCenter:
     from core.integrations.gdrive import GoogleDrive
     cc._gdrive = GoogleDrive(config.get("gdrive", {}))
 
+    # Connect CostAgent to ModelRouter for usage tracking
+    cost_agent = getattr(cc._kernel, "agents", {}).get("cost") \
+        if hasattr(cc._kernel, "agents") else None
+    if cost_agent:
+        model_router._cost_agent = cost_agent
+
     # Register agents with proper SOUL.md files
     from agents.base_agent import GenericAgent
 
