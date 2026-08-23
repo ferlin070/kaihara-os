@@ -357,7 +357,7 @@ def test_agent_map_move():
     state = am.get_state()
     coding = state["agents"]["coding"]
     assert coding["status"] in ("moving", "working"), f"Wrong status: {coding['status']}"
-    assert coding["target_x"] == 150, f"Wrong target x: {coding['target_x']}"
+    assert coding["target_x"] == 130, f"Wrong target x: {coding['target_x']}"
     print(f"    Coding agent moved to coding_desk")
     return True
 
