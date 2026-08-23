@@ -84,33 +84,37 @@ export default function Conversation({
   }
 
   const shouldListenRef = useRef(false)
+  const transcriptRef = useRef('')
 
   const startListening = () => {
     shouldListenRef.current = true
+    transcriptRef.current = ''
+    setInterim('')
+    setInput('')
 
     const createAndStart = () => {
       const rec = getRecognition()
       if (!rec) return
       recognitionRef.current = rec
-      rec.continuous = true  // Keep listening across phrases
+      rec.continuous = true
 
       rec.onresult = (e: any) => {
-        let finalText = ''
         let interimText = ''
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const t = e.results[i][0].transcript
-          if (e.results[i].isFinal) finalText += t
-          else interimText += t
+          if (e.results[i].isFinal) {
+            // Accumulate — don't send yet
+            transcriptRef.current += t.trim() + ' '
+          } else {
+            interimText += t
+          }
         }
+        // Show live preview in input box
+        setInput((transcriptRef.current + interimText).trim())
         setInterim(interimText)
-        if (finalText.trim()) {
-          setInterim('')
-          onSend(finalText.trim())
-        }
       }
 
       rec.onerror = (e: any) => {
-        // 'no-speech' or 'aborted' — just restart; real errors stop
         if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') {
           shouldListenRef.current = false
           setListening(false)
@@ -119,15 +123,11 @@ export default function Conversation({
 
       rec.onend = () => {
         if (shouldListenRef.current) {
-          // Auto-restart — keep mic alive like Gemini voice
           setTimeout(() => {
             if (shouldListenRef.current) {
               try { rec.start() } catch {}
             }
           }, 250)
-        } else {
-          setListening(false)
-          setInterim('')
         }
       }
 
@@ -145,6 +145,13 @@ export default function Conversation({
     try { recognitionRef.current?.stop() } catch {}
     setListening(false)
     setInterim('')
+    // Send everything that was said, once
+    const full = transcriptRef.current.trim()
+    transcriptRef.current = ''
+    if (full) {
+      onSend(full)
+    }
+    setInput('')
   }
 
   const handleSpeak = (text: string) => speak(text).catch(() => {})
@@ -246,8 +253,8 @@ export default function Conversation({
             }`} title={listening ? 'Stop listening' : sttAvailable ? 'Speak (browser mic)' : 'Browser does not support speech recognition'}>
             🎙️
           </button>
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
-            placeholder={listening ? (interim || 'Listening...') : 'Type message...'}
+          <input type="text" value={input} onChange={(e) => { if (!listening) setInput(e.target.value) }}
+            placeholder={listening ? '🔴 Recording... tekan STOP untuk hantar' : 'Type message...'}
             className="flex-1 bg-kaihara-surface border border-kaihara-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-kaihara-accent min-w-0"
             autoFocus />
           <button type="submit" disabled={!input.trim() || thinking} className="flex-shrink-0 btn-primary disabled:opacity-50">
