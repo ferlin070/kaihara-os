@@ -216,7 +216,7 @@ export default function Conversation({
                   : 'bg-kaihara-surface border border-kaihara-border'
               }`}>
                 <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
-                {msg.route && <p className="text-xs opacity-60 mt-1.5">route: {msg.route}</p>}
+                {(msg.route || msg.provider) && <p className="text-xs opacity-60 mt-1.5">{msg.route && <>route: {msg.route}</>}{msg.route && msg.provider && ' · '}{msg.provider && <>via {msg.provider}</>}</p>}
               </div>
               {msg.role === 'kaihara' && msg.text && (
                 <button onClick={() => handleSpeak(msg.text)} className="mt-1 ml-1 text-xs text-kaihara-muted hover:text-kaihara-accent transition-colors">

@@ -22,6 +22,7 @@ class ModelRouter:
             "fallback_chain",
             ["9router/ag/gemini-3-flash", "ollama/llama3.2:1b"]
         )
+        self.last_provider = ""
         self.agent_models = {}
         for key, val in config.items():
             if key.startswith("agent."):
@@ -76,6 +77,7 @@ class ModelRouter:
             result, ok = await self._attempt(provider, model_name,
                                              system, messages)
             if ok:
+                self.last_provider = f"{provider}/{model_name}"
                 input_tokens = sum(len(m.get("content", "")) // 4
                                    for m in messages) + len(system) // 4
                 self._record_cost(provider, model_name, input_tokens,

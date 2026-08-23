@@ -17,6 +17,7 @@ export interface ChatResponse {
   route: string
   intent: { text: string; type: string; agents: string[]; is_workflow: boolean }
   source: string
+  provider?: string
 }
 
 export interface SystemStatus {

@@ -20,7 +20,7 @@ import {
   type SystemStatus as Status, type Conversation as Conv,
 } from './lib/api'
 
-export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string }
+export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string; provider?: string }
 
 const ACTIVE_CONV_KEY = 'kaihara_active_conv'
 
@@ -140,7 +140,7 @@ export default function App() {
     setThinking(true)
     try {
       const res = await sendMessage(text, 'dashboard', activeConvId)
-      setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route }])
+      setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route, provider: (res as any).provider }])
       fetchConversations() // refresh order + message count + auto-title
     } catch {
       setMessages(prev => [...prev, { role: 'kaihara', text: '[Connection error. Is Kaihara server running on :7000?]' }])

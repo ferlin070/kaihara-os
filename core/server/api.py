@@ -22,6 +22,7 @@ class ChatResponse(BaseModel):
     route: str
     intent: dict
     source: str
+    provider: str = ""
 
 
 def create_app(command_center) -> FastAPI:
@@ -79,6 +80,8 @@ def create_app(command_center) -> FastAPI:
             route=result["route"],
             intent=result["intent"],
             source=result["source"],
+            provider=getattr(command_center.model, "last_provider", "")
+            if command_center.model else "",
         )
 
     @app.post("/api/webhook")
