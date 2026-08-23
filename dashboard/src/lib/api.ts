@@ -217,12 +217,16 @@ export function useWebSocket(onMessage: (data: any) => void) {
 export interface Task {
   id: string
   title: string
+  description?: string
   phase: string
   status: string
   dependencies: string[]
   complexity: string
+  criteria?: string[]
   assigned_agent?: string
   prd_id?: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Progress {
@@ -244,9 +248,12 @@ export async function plan(idea: string, context = ''): Promise<any> {
   return res.json()
 }
 
-export async function getTasks(prdId?: string): Promise<{ tasks: Task[] }> {
-  const params = prdId ? `?prd_id=${prdId}` : ''
-  const res = await fetch(`${API_BASE}/planning/tasks${params}`)
+export async function getTasks(prdId?: string, status?: string): Promise<{ tasks: Task[] }> {
+  const p = new URLSearchParams()
+  if (prdId) p.set('prd_id', prdId)
+  if (status) p.set('status', status)
+  const q = p.toString()
+  const res = await fetch(`${API_BASE}/planning/tasks${q ? '?' + q : ''}`)
   return res.json()
 }
 
@@ -261,6 +268,43 @@ export async function updateTaskStatus(taskId: string, status: string): Promise<
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
+  })
+  return res.json()
+}
+
+export async function deleteTask(taskId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/planning/tasks/${taskId}`, { method: 'DELETE' })
+  return res.json()
+}
+
+export async function bulkUpdateTasks(taskIds: string[], status: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/planning/tasks/bulk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task_ids: taskIds, status }),
+  })
+  return res.json()
+}
+
+export async function assignTask(taskId: string, agent: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/planning/tasks/${taskId}/assign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent }),
+  })
+  return res.json()
+}
+
+export async function deletePrd(prdId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/planning/prds/${prdId}`, { method: 'DELETE' })
+  return res.json()
+}
+
+export async function approvePrd(prdId: string, approved: boolean): Promise<any> {
+  const res = await fetch(`${API_BASE}/planning/prds/${prdId}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ approved }),
   })
   return res.json()
 }

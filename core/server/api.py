@@ -386,7 +386,50 @@ def create_app(command_center) -> FastAPI:
         pipeline = getattr(command_center, "_planning", None)
         if not pipeline:
             return {"error": "Planning pipeline not initialized"}
-        return {"tasks": pipeline.get_tasks(prd_id=prd_id)}
+        return {"tasks": pipeline.get_tasks(prd_id=prd_id, status=status)}
+
+    @app.delete("/api/planning/tasks/{task_id}")
+    async def delete_task(task_id: str):
+        pipeline = getattr(command_center, "_planning", None)
+        if not pipeline:
+            return {"error": "Planning pipeline not initialized"}
+        return pipeline.tracker.delete_task(task_id)
+
+    @app.post("/api/planning/tasks/bulk")
+    async def bulk_update_tasks(payload: dict):
+        pipeline = getattr(command_center, "_planning", None)
+        if not pipeline:
+            return {"error": "Planning pipeline not initialized"}
+        task_ids = payload.get("task_ids", [])
+        status = payload.get("status", "")
+        results = {}
+        for tid in task_ids:
+            results[tid] = pipeline.tracker.update_task(tid, status=status)
+        return {"updated": len(results), "results": results}
+
+    @app.post("/api/planning/tasks/{task_id}/assign")
+    async def assign_task(task_id: str, payload: dict):
+        pipeline = getattr(command_center, "_planning", None)
+        if not pipeline:
+            return {"error": "Planning pipeline not initialized"}
+        agent = payload.get("agent", "")
+        return pipeline.tracker.update_task(task_id, assigned_agent=agent)
+
+    @app.delete("/api/planning/prds/{prd_id}")
+    async def delete_prd(prd_id: str):
+        pipeline = getattr(command_center, "_planning", None)
+        if not pipeline:
+            return {"error": "Planning pipeline not initialized"}
+        return pipeline.tracker.delete_prd(prd_id)
+
+    @app.post("/api/planning/prds/{prd_id}/approve")
+    async def approve_prd(prd_id: str, payload: dict):
+        pipeline = getattr(command_center, "_planning", None)
+        if not pipeline:
+            return {"error": "Planning pipeline not initialized"}
+        approved = payload.get("approved", True)
+        status = "approved" if approved else "rejected"
+        return pipeline.tracker.update_prd(prd_id, status=status)
 
     @app.get("/api/planning/progress")
     async def get_progress(prd_id: str = None):

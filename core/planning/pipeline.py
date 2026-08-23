@@ -103,8 +103,8 @@ class PlanningPipeline:
             "message": f"Generated {len(tasks)} tasks.",
         }
 
-    def get_tasks(self, prd_id: str = None) -> list[dict]:
-        return self.tracker.get_tasks(prd_id=prd_id)
+    def get_tasks(self, prd_id: str = None, status: str = None) -> list[dict]:
+        return self.tracker.get_tasks(prd_id=prd_id, status=status)
 
     def get_progress(self, prd_id: str = None) -> dict:
         return self.tracker.get_progress(prd_id=prd_id)

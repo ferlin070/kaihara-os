@@ -95,6 +95,51 @@ class TaskTracker:
         self.conn.commit()
         return True
 
+    def update_task(self, task_id: str, **kwargs) -> dict:
+        """Update any task fields."""
+        allowed = {"title", "description", "phase", "status", "complexity",
+                   "dependencies", "criteria", "assigned_agent"}
+        updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+        if not updates:
+            return {"error": "No valid fields to update"}
+        now = datetime.now().isoformat()
+        updates["updated_at"] = now
+        for key in ("dependencies", "criteria"):
+            if key in updates and isinstance(updates[key], (list, dict)):
+                updates[key] = json.dumps(updates[key])
+        set_clause = ", ".join(f"{k}=?" for k in updates)
+        values = list(updates.values()) + [task_id]
+        self.conn.execute(f"UPDATE tasks SET {set_clause} WHERE id=?", values)
+        self.conn.commit()
+        return {"updated": True, "task_id": task_id}
+
+    def delete_task(self, task_id: str) -> dict:
+        """Delete a single task."""
+        self.conn.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+        self.conn.commit()
+        return {"deleted": task_id}
+
+    def delete_prd(self, prd_id: str) -> dict:
+        """Delete a PRD and its associated tasks."""
+        self.conn.execute("DELETE FROM tasks WHERE prd_id=?", (prd_id,))
+        self.conn.execute("DELETE FROM prds WHERE id=?", (prd_id,))
+        self.conn.commit()
+        return {"deleted": prd_id}
+
+    def update_prd(self, prd_id: str, **kwargs) -> dict:
+        """Update PRD fields (status, title, etc)."""
+        allowed = {"title", "content", "parsed", "status"}
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return {"error": "No valid fields"}
+        if "parsed" in updates and isinstance(updates["parsed"], dict):
+            updates["parsed"] = json.dumps(updates["parsed"])
+        set_clause = ", ".join(f"{k}=?" for k in updates)
+        values = list(updates.values()) + [prd_id]
+        self.conn.execute(f"UPDATE prds SET {set_clause} WHERE id=?", values)
+        self.conn.commit()
+        return {"updated": True, "prd_id": prd_id}
+
     def get_tasks(self, prd_id: str = None,
                  status: str = None) -> list[dict]:
         query = "SELECT * FROM tasks"
