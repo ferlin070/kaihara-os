@@ -560,8 +560,8 @@ def create_app(command_center) -> FastAPI:
             return {"error": "No repo URL provided"}
 
         # Parse GitHub URL
-        # Handle: https://github.com/owner/repo or owner/repo
-        repo_url = repo_url.strip().rstrip("/")
+        # Handle: https://github.com/owner/repo(.git) or owner/repo(.git)
+        repo_url = repo_url.strip().rstrip("/").removesuffix(".git")
         if "github.com/" in repo_url:
             parts = repo_url.split("github.com/")[-1].split("/")
             if len(parts) < 2:
@@ -569,9 +569,10 @@ def create_app(command_center) -> FastAPI:
             owner, repo = parts[0], parts[1]
         else:
             parts = repo_url.split("/")
-            if len(parts) != 2:
+            if len(parts) < 2:
                 return {"error": "Format: owner/repo or full GitHub URL"}
             owner, repo = parts[0], parts[1]
+        repo = repo.removesuffix(".git")
 
         # Fetch repo tree via GitHub API
         try:
@@ -581,8 +582,13 @@ def create_app(command_center) -> FastAPI:
                     f"https://api.github.com/repos/{owner}/{repo}",
                     timeout=10
                 )
+                if resp.status_code == 403:
+                    return {"error": "GitHub API rate limit exceeded — cuba lagi dalam beberapa minit"}
                 if resp.status_code != 200:
-                    return {"error": f"Repository not found: {owner}/{repo}"}
+                    return {"error": (
+                        f"Repository not found: {owner}/{repo}. "
+                        "Pastikan repo WUJUD, PUBLIC, dan tiada typo. "
+                        "(Jangan masukkan .git di akhir)")}
                 default_branch = resp.json().get("default_branch", "main")
 
                 # Get file tree
@@ -782,6 +788,20 @@ def create_app(command_center) -> FastAPI:
             return {"error": "Approval gate not initialized"}
         reason = (payload or {}).get("reason", "")
         return await gate.deny(request_id, reason)
+
+    @app.post("/api/security/approvals/demo")
+    async def create_demo_approval():
+        """Create a test approval request (for exercising the approve/deny flow)."""
+        gate = getattr(command_center, "_approval_gate", None)
+        if not gate:
+            return {"error": "approval gate not initialized"}
+        result = await gate.request(
+            action="execute_shell",
+            agent_type="dashboard-test",
+            details={"command": "echo 'demo approval'", "note":
+                    "Test approval created from dashboard"},
+        )
+        return result
 
     @app.get("/api/security/audit")
     async def audit_log(limit: int = 50, agent: str = None,

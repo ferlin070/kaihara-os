@@ -3,6 +3,7 @@ import {
   getSecurityStatus,
   getApprovals,
   approveAction,
+  createDemoApproval,
   denyAction,
   getAuditLog,
   runPentest,
@@ -421,7 +422,13 @@ function Approvals() {
 
   useEffect(() => { fetch(); const i = setInterval(fetch, 5000); return () => clearInterval(i) }, [fetch])
 
+  const [creatingDemo, setCreatingDemo] = useState(false)
   const handleApprove = async (id: string) => { await approveAction(id); fetch() }
+  const handleCreateDemo = async () => {
+    setCreatingDemo(true)
+    try { await createDemoApproval(); fetch() } catch {}
+    setCreatingDemo(false)
+  }
   const handleDeny = async (id: string) => { await denyAction(id, 'Denied by user'); fetch() }
 
   return (
@@ -436,7 +443,14 @@ function Approvals() {
         </div>
         {pending.length === 0 ? (
           <div className="hud-panel text-center py-6">
-            <p className="text-sm text-kaihara-muted">No pending approvals</p>
+            <p className="text-sm text-kaihara-muted mb-2">No pending approvals</p>
+            <button
+              onClick={handleCreateDemo}
+              disabled={creatingDemo}
+              className="px-3 py-1.5 text-xs bg-kaihara-accent text-white rounded hover:bg-kaihara-accent/80 disabled:opacity-50"
+            >
+              {creatingDemo ? 'Creating...' : '🧪 Create Test Approval'}
+            </button>
             <p className="text-xs text-kaihara-muted mt-1">Dangerous actions will appear here</p>
           </div>
         ) : (

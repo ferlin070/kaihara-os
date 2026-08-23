@@ -503,6 +503,11 @@ export async function approveAction(requestId: string): Promise<any> {
   return res.json()
 }
 
+export async function createDemoApproval(): Promise<any> {
+  const res = await fetch(`${API_BASE}/security/approvals/demo`, { method: 'POST' })
+  return res.json()
+}
+
 export async function denyAction(requestId: string, reason?: string): Promise<any> {
   const res = await fetch(`${API_BASE}/security/approvals/${requestId}/deny`, {
     method: 'POST',
