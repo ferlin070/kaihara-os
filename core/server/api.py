@@ -776,10 +776,35 @@ def create_app(command_center) -> FastAPI:
 
     @app.post("/api/security/approvals/{request_id}/approve")
     async def approval_approve(request_id: str):
+        import asyncio as _asyncio
         gate = getattr(command_center, "_approval_gate", None)
         if not gate:
             return {"error": "Approval gate not initialized"}
-        return await gate.approve(request_id)
+        result = await gate.approve(request_id)
+
+        # Auto-resume approved actions (pentest etc.)
+        if "error" not in result and result.get("status") == "approved":
+            entry = gate._get(request_id)
+            action = entry.get("action", "")
+            details = entry.get("details", {}) or {}
+
+            if action == "run_pentest":
+                target = details.get("target", "")
+                pentest = getattr(command_center, "_pentest", None)
+                if pentest and target:
+                    async def _run():
+                        try:
+                            await pentest.run(target, approved=True)
+                        except Exception as e:
+                            import logging
+                            logging.getLogger("kaihara.pentest").error(
+                                f"Auto-resumed pentest failed: {e}")
+                    _asyncio.create_task(_run())
+                    result["resumed"] = True
+                    result["message"] = (
+                        f"Pentest on {target} started in background. "
+                        "Lihat hasil di tab Pentest.")
+        return result
 
     @app.post("/api/security/approvals/{request_id}/deny")
     async def approval_deny(request_id: str, payload: dict = None):

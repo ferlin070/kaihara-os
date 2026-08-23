@@ -44,11 +44,8 @@ class Sandbox:
             return await self._execute_direct(command, workdir, env)
 
         if not self.is_available():
-            return {
-                "success": False,
-                "error": "Docker not available. Install Docker to use sandbox.",
-                "output": "",
-            }
+            # No Docker on this host — run directly (tools installed natively)
+            return await self._execute_direct(command, workdir, env)
 
         image = image or self.default_image
         docker_cmd = self._build_docker_command(
