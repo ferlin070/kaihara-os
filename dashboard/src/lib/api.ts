@@ -50,11 +50,53 @@ export async function getStatus(): Promise<SystemStatus> {
   return res.json()
 }
 
-export async function sendMessage(message: string, source = 'dashboard'): Promise<ChatResponse> {
+export async function sendMessage(message: string, source = 'dashboard', convId?: string): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, source, conv_id: 'dashboard' }),
+    body: JSON.stringify({ message, source, conv_id: convId || localStorage.getItem('kaihara_active_conv') || 'dashboard' }),
+  })
+  return res.json()
+}
+
+// ============================================================
+// Conversation Management
+// ============================================================
+
+export interface Conversation {
+  conv_id: string
+  title: string
+  created_at: string
+  updated_at: string
+  message_count: number
+}
+
+export async function getConversations(limit = 50): Promise<{ conversations: Conversation[] }> {
+  const res = await fetch(`${API_BASE}/chat/conversations?limit=${limit}`)
+  return res.json()
+}
+
+export async function newConversation(title = 'New Chat'): Promise<{ conv_id: string; title: string }> {
+  const res = await fetch(`${API_BASE}/chat/new`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
+  return res.json()
+}
+
+export async function renameConversation(convId: string, title: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/chat/conversations/${convId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
+  return res.json()
+}
+
+export async function deleteConversation(convId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/chat/conversations/${convId}`, {
+    method: 'DELETE',
   })
   return res.json()
 }

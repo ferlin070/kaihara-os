@@ -18,6 +18,7 @@ language = "ms"
 default = "rootsys/glm-5.2"
 small_model = "rootsys/deepseek-v4-flash"
 reflex_model = "rootsys/deepseek-v4-flash"
+fallback_chain = ["9router/ag/gemini-3-flash", "ollama/llama3.2:1b"]
 
 # ============================================================
 #  PROVIDERS
@@ -30,7 +31,12 @@ api_key_header = "X-API-Key"
 
 [provider.ollama]
 name = "Ollama (local)"
-base_url = "http://localhost:11434/v1"
+base_url = "http://192.168.1.99:11434/v1"
+
+[provider.9router]
+name = "9Router (free proxy)"
+base_url = "http://192.168.1.41:20128/v1"
+api_key_header = "Authorization"
 
 # ============================================================
 #  AGENT MODEL ROUTING

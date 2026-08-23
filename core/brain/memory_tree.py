@@ -97,6 +97,14 @@ class MemoryTree:
                 timestamp TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_chat_conv ON chat_history(conv_id, id);
+            CREATE TABLE IF NOT EXISTS conversations (
+                conv_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                source TEXT DEFAULT 'dashboard',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_conv_updated ON conversations(updated_at);
             CREATE INDEX IF NOT EXISTS idx_raw_ts ON raw(timestamp);
             CREATE INDEX IF NOT EXISTS idx_summary_topic ON summary(topic);
             CREATE INDEX IF NOT EXISTS idx_daily_date ON daily_memory(date);
@@ -366,6 +374,17 @@ class MemoryTree:
                 "VALUES (?,?,?,?)",
                 (conv_id, role, content, now)
             )
+            # Auto-register conversation + touch updated_at
+            self.conn.execute(
+                "INSERT OR IGNORE INTO conversations "
+                "(conv_id, title, source, created_at, updated_at) "
+                "VALUES (?,?,?,?,?)",
+                (conv_id, content[:40], "chat", now, now)
+            )
+            self.conn.execute(
+                "UPDATE conversations SET updated_at = ? WHERE conv_id = ?",
+                (now, conv_id)
+            )
             self.conn.commit()
         except Exception:
             pass
@@ -398,6 +417,69 @@ class MemoryTree:
             self.conn.commit()
         except Exception:
             pass
+
+    def list_conversations(self, limit: int = 50) -> list[dict]:
+        """All conversations, most recent first."""
+        try:
+            rows = self.conn.execute(
+                "SELECT conv_id, title, created_at, updated_at "
+                "FROM conversations ORDER BY updated_at DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
+            result = []
+            for r in rows:
+                count = self.conn.execute(
+                    "SELECT COUNT(*) FROM chat_history WHERE conv_id = ?",
+                    (r["conv_id"],)
+                ).fetchone()[0]
+                result.append({
+                    "conv_id": r["conv_id"], "title": r["title"],
+                    "created_at": r["created_at"],
+                    "updated_at": r["updated_at"],
+                    "message_count": count,
+                })
+            return result
+        except Exception:
+            return []
+
+    def create_conversation(self, title: str = "New Chat",
+                            source: str = "dashboard") -> str:
+        import uuid
+        conv_id = f"c_{uuid.uuid4().hex[:10]}"
+        now = datetime.now().isoformat()
+        try:
+            self.conn.execute(
+                "INSERT INTO conversations VALUES (?,?,?,?,?)",
+                (conv_id, title, source, now, now)
+            )
+            self.conn.commit()
+        except Exception:
+            pass
+        return conv_id
+
+    def rename_conversation(self, conv_id: str, title: str) -> bool:
+        try:
+            cur = self.conn.execute(
+                "UPDATE conversations SET title = ?, updated_at = ? "
+                "WHERE conv_id = ?",
+                (title, datetime.now().isoformat(), conv_id)
+            )
+            self.conn.commit()
+            return cur.rowcount > 0
+        except Exception:
+            return False
+
+    def delete_conversation(self, conv_id: str) -> bool:
+        try:
+            self.conn.execute(
+                "DELETE FROM chat_history WHERE conv_id = ?", (conv_id,))
+            cur = self.conn.execute(
+                "DELETE FROM conversations WHERE conv_id = ?", (conv_id,))
+            self._context_cache.pop(conv_id, None)
+            self.conn.commit()
+            return True
+        except Exception:
+            return False
 
     def clear_context(self, conv_id: str):
         self._context_cache.pop(conv_id, None)

@@ -13,9 +13,16 @@ import ChannelStatus from './components/ChannelStatus'
 import KernelStatus from './components/KernelStatus'
 import MetaPanel from './components/MetaPanel'
 import AgentMap from './components/AgentMap'
-import { getStatus, sendMessage, getMapState, getChatHistory, type SystemStatus as Status } from './lib/api'
+import ChatSessions from './components/ChatSessions'
+import {
+  getStatus, sendMessage, getMapState, getChatHistory,
+  getConversations, newConversation, renameConversation, deleteConversation,
+  type SystemStatus as Status, type Conversation as Conv,
+} from './lib/api'
 
 export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string }
+
+const ACTIVE_CONV_KEY = 'kaihara_active_conv'
 
 export default function App() {
   const [status, setStatus] = useState<Status | null>(null)
@@ -24,6 +31,9 @@ export default function App() {
   const [agents, setAgents] = useState<{name: string; status: string; task: string; progress: number}[]>([])
   const [notifications, setNotifications] = useState<{type: string; text: string}[]>([])
   const [activeTab, setActiveTab] = useState<'chat' | 'map' | 'tasks' | 'skills' | 'security' | 'memory'>('chat')
+  const [activeConvId, setActiveConvId] = useState<string>(
+    () => localStorage.getItem(ACTIVE_CONV_KEY) || 'dashboard')
+  const [conversations, setConversations] = useState<Conv[]>([])
 
   const failCountRef = useRef(0)
 
@@ -53,37 +63,85 @@ export default function App() {
     return () => clearInterval(interval)
   }, [fetchStatus])
 
-  // Load chat history: localStorage first (instant), then server (authoritative)
-  useEffect(() => {
+  // Load conversation list
+  const fetchConversations = useCallback(async () => {
     try {
-      const cached = localStorage.getItem('kaihara_chat_history')
-      if (cached) setMessages(JSON.parse(cached))
+      const data = await getConversations()
+      setConversations(data.conversations || [])
     } catch {}
-    getChatHistory().then(({ messages }) => {
+  }, [])
+
+  // Load chat history for active conversation: localStorage first, then server
+  useEffect(() => {
+    localStorage.setItem(ACTIVE_CONV_KEY, activeConvId)
+    try {
+      const cached = localStorage.getItem(`kaihara_chat_${activeConvId}`)
+      if (cached) setMessages(JSON.parse(cached))
+      else setMessages([])
+    } catch { setMessages([]) }
+    getChatHistory(activeConvId).then(({ messages }) => {
       if (messages && messages.length > 0) {
         const msgs = messages.map(m => ({
           role: m.role === 'assistant' ? 'kaihara' : 'user',
           text: m.text,
         })) as Msg[]
         setMessages(msgs)
-        localStorage.setItem('kaihara_chat_history', JSON.stringify(msgs))
       }
     }).catch(() => {})
-  }, [])
+    fetchConversations()
+  }, [activeConvId, fetchConversations])
 
   // Persist to localStorage on every change
   useEffect(() => {
     try {
-      localStorage.setItem('kaihara_chat_history', JSON.stringify(messages.slice(-200)))
+      localStorage.setItem(`kaihara_chat_${activeConvId}`, JSON.stringify(messages.slice(-200)))
     } catch {}
-  }, [messages])
+  }, [messages, activeConvId])
+
+  const handleNewChat = async () => {
+    try {
+      const conv = await newConversation('New Chat')
+      setActiveConvId(conv.conv_id)
+      setMessages([])
+      fetchConversations()
+      setActiveTab('chat')
+    } catch {
+      // Offline fallback: temp local id
+      setActiveConvId(`c_local_${Date.now()}`)
+      setMessages([])
+      setActiveTab('chat')
+    }
+  }
+
+  const handleSelectConv = (convId: string) => {
+    setActiveConvId(convId)
+    setActiveTab('chat')
+  }
+
+  const handleRenameConv = async (convId: string) => {
+    const title = prompt('Rename chat:')
+    if (!title?.trim()) return
+    await renameConversation(convId, title.trim())
+    fetchConversations()
+  }
+
+  const handleDeleteConv = async (convId: string) => {
+    if (!confirm('Delete this chat permanently?')) return
+    await deleteConversation(convId)
+    if (convId === activeConvId) {
+      handleNewChat()
+    } else {
+      fetchConversations()
+    }
+  }
 
   const handleSend = async (text: string) => {
     setMessages(prev => [...prev, { role: 'user', text }])
     setThinking(true)
     try {
-      const res = await sendMessage(text)
+      const res = await sendMessage(text, 'dashboard', activeConvId)
       setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route }])
+      fetchConversations() // refresh order + message count + auto-title
     } catch {
       setMessages(prev => [...prev, { role: 'kaihara', text: '[Connection error. Is Kaihara server running on :7000?]' }])
     }
@@ -119,6 +177,14 @@ export default function App() {
       <div className="flex-1 flex min-h-0">
         {/* Left Sidebar — scroll dalam diri sendiri */}
         <aside className="w-64 flex-shrink-0 border-r border-kaihara-border p-3 overflow-y-auto space-y-3">
+          <ChatSessions
+            conversations={conversations}
+            activeConvId={activeConvId}
+            onSelect={handleSelectConv}
+            onNewChat={handleNewChat}
+            onRename={handleRenameConv}
+            onDelete={handleDeleteConv}
+          />
           <KaiharaStatus thinking={thinking} online={!!status?.kaihara_online} />
           <ChannelStatus />
           <KernelStatus />

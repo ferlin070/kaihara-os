@@ -124,6 +124,43 @@ def create_app(command_center) -> FastAPI:
         command_center.memory.clear_chat_history(conv_id)
         return {"status": "cleared", "conv_id": conv_id}
 
+    # ============================================================
+    # Conversation Management
+    # ============================================================
+
+    @app.get("/api/chat/conversations")
+    async def list_conversations(limit: int = 50):
+        if not command_center.memory:
+            return {"error": "memory not initialized"}
+        return {"conversations":
+                command_center.memory.list_conversations(limit)}
+
+    @app.post("/api/chat/new")
+    async def new_conversation(payload: dict = None):
+        if not command_center.memory:
+            return {"error": "memory not initialized"}
+        payload = payload or {}
+        title = payload.get("title", "New Chat")
+        source = payload.get("source", "dashboard")
+        conv_id = command_center.memory.create_conversation(title, source)
+        return {"conv_id": conv_id, "title": title}
+
+    @app.patch("/api/chat/conversations/{conv_id}")
+    async def rename_conversation(conv_id: str, payload: dict):
+        if not command_center.memory:
+            return {"error": "memory not initialized"}
+        ok = command_center.memory.rename_conversation(
+            conv_id, payload.get("title", "").strip() or "Untitled")
+        return {"status": "renamed" if ok else "not_found", "conv_id": conv_id}
+
+    @app.delete("/api/chat/conversations/{conv_id}")
+    async def delete_conversation(conv_id: str):
+        if not command_center.memory:
+            return {"error": "memory not initialized"}
+        ok = command_center.memory.delete_conversation(conv_id)
+        return {"status": "deleted" if ok else "not_found",
+                "conv_id": conv_id}
+
     @app.get("/api/goals")
     async def get_goals():
         if not command_center.memory:
