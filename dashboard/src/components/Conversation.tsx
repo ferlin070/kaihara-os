@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import type { Msg } from '../App'
 import { getVoiceStatus, speak, type VoiceStatus } from '../lib/api'
+import MarkdownRenderer from './MarkdownRenderer'
 
 // Web Speech API types
 interface SpeechRecognitionLike {
@@ -215,7 +216,11 @@ export default function Conversation({
                   ? 'bg-kaihara-primary text-white'
                   : 'bg-kaihara-surface border border-kaihara-border'
               }`}>
-                <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
+                {msg.role === 'kaihara' ? (
+                  <MarkdownRenderer content={msg.text} />
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
+                )}
                 {(msg.route || msg.provider) && <p className="text-xs opacity-60 mt-1.5">{msg.route && <>route: {msg.route}</>}{msg.route && msg.provider && ' · '}{msg.provider && <>via {msg.provider}</>}</p>}
               </div>
               {msg.role === 'kaihara' && msg.text && (
