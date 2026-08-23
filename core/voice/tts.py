@@ -159,3 +159,31 @@ class TTS:
         except ImportError:
             pass
         return False
+
+    def status(self) -> dict:
+        """TTS status for voice pipeline."""
+        available = False
+        engine = "none"
+        try:
+            import edge_tts  # noqa: F401
+            available = True
+            engine = "edge-neural"
+        except ImportError:
+            pass
+        if not available:
+            try:
+                result = subprocess.run(
+                    [self.piper_path, "--help"],
+                    capture_output=True, timeout=5,
+                )
+                if result.returncode == 0:
+                    available = True
+                    engine = "piper"
+            except (FileNotFoundError, Exception):
+                pass
+        return {
+            "engine": engine,
+            "voice": self.VOICES.get(self.default_voice, self.voice),
+            "available": available,
+            "fallback": "pyttsx3",
+        }
