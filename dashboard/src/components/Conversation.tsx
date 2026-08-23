@@ -83,39 +83,66 @@ export default function Conversation({
     setInput('')
   }
 
+  const shouldListenRef = useRef(false)
+
   const startListening = () => {
-    const rec = getRecognition()
-    if (!rec) return
-    recognitionRef.current = rec
+    shouldListenRef.current = true
 
-    rec.onresult = (e: any) => {
-      let finalText = ''
-      let interimText = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript
-        if (e.results[i].isFinal) finalText += t
-        else interimText += t
+    const createAndStart = () => {
+      const rec = getRecognition()
+      if (!rec) return
+      recognitionRef.current = rec
+      rec.continuous = true  // Keep listening across phrases
+
+      rec.onresult = (e: any) => {
+        let finalText = ''
+        let interimText = ''
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript
+          if (e.results[i].isFinal) finalText += t
+          else interimText += t
+        }
+        setInterim(interimText)
+        if (finalText.trim()) {
+          setInterim('')
+          onSend(finalText.trim())
+        }
       }
-      setInterim(interimText)
-      if (finalText.trim()) {
-        setInterim('')
-        onSend(finalText.trim())
+
+      rec.onerror = (e: any) => {
+        // 'no-speech' or 'aborted' — just restart; real errors stop
+        if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') {
+          shouldListenRef.current = false
+          setListening(false)
+        }
       }
-    }
-    rec.onerror = () => setListening(false)
-    rec.onend = () => {
-      setListening(false)
-      setInterim('')
+
+      rec.onend = () => {
+        if (shouldListenRef.current) {
+          // Auto-restart — keep mic alive like Gemini voice
+          setTimeout(() => {
+            if (shouldListenRef.current) {
+              try { rec.start() } catch {}
+            }
+          }, 250)
+        } else {
+          setListening(false)
+          setInterim('')
+        }
+      }
+
+      try {
+        rec.start()
+        setListening(true)
+      } catch {}
     }
 
-    try {
-      rec.start()
-      setListening(true)
-    } catch {}
+    createAndStart()
   }
 
   const stopListening = () => {
-    recognitionRef.current?.stop()
+    shouldListenRef.current = false
+    try { recognitionRef.current?.stop() } catch {}
     setListening(false)
     setInterim('')
   }
