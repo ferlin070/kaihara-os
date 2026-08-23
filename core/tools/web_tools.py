@@ -164,3 +164,278 @@ def search_places(query: str, max_results: int = 10) -> str:
                           ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": f"search_places failed: {e}"})
+
+
+# ============================================================
+# Marketing / Competitor Analysis Tools
+# ============================================================
+
+def analyze_competitor(url: str) -> str:
+    """Analyze a competitor website: tech stack, SEO basics, content strategy."""
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    try:
+        with httpx.Client(timeout=25, follow_redirects=True,
+                          headers={"User-Agent": USER_AGENT}) as client:
+            resp = client.get(url)
+            html = resp.text
+
+        soup = BeautifulSoup(html, "html.parser")
+        result: dict[str, Any] = {"url": url}
+
+        # Title & meta
+        result["title"] = soup.title.get_text(strip=True) if soup.title else ""
+        desc = soup.find("meta", attrs={"name": "description"})
+        result["meta_description"] = desc["content"][:200] if desc else ""
+
+        # Tech stack detection (scripts, generators, frameworks)
+        scripts = [s.get("src", "") for s in soup.find_all("script", src=True)]
+        tech_hints = []
+        tech_patterns = {
+            "WordPress": [r"wp-content", r"wp-includes"],
+            "Shopify": [r"shopify", r"cdn\.shopify"],
+            "Wix": [r"wix\.com", r"parastorage"],
+            "React": [r"react", r"__NEXT_DATA__"],
+            "Next.js": [r"__NEXT_DATA__", r"next"],
+            "Vue": [r"vue\.js", r"vue\.min\.js"],
+            "Angular": [r"ng-version", r"angular"],
+            "Bootstrap": [r"bootstrap\.min"],
+            "Tailwind": [r"tailwindcss"],
+            "Google Analytics": [r"google-analytics", r"gtag", r"ga\.js"],
+            "Facebook Pixel": [r"fbevents", r"facebook\.net/en_US/fbevents"],
+            "Hotjar": [r"hotjar"],
+            "HubSpot": [r"hubspot"],
+        }
+        for tech, patterns in tech_patterns.items():
+            for p in patterns:
+                if re.search(p, html, re.IGNORECASE):
+                    tech_hints.append(tech)
+                    break
+        result["tech_stack"] = list(set(tech_hints))
+
+        # Social links
+        social = {}
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            for platform in ["facebook.com", "instagram.com", "twitter.com",
+                             "x.com", "linkedin.com", "tiktok.com", "youtube.com",
+                             "shopee.com.my", "lazada.com.my"]:
+                if platform in href:
+                    social[platform.split(".")[0]] = href
+        result["social_links"] = social
+
+        # Content analysis
+        h1s = [h.get_text(strip=True) for h in soup.find_all("h1")]
+        h2s = [h.get_text(strip=True) for h in soup.find_all("h2")]
+        result["headings"] = {"h1": h1s[:5], "h2": h2s[:8]}
+
+        # Image alt text analysis (SEO)
+        imgs = soup.find_all("img")
+        imgs_with_alt = sum(1 for i in imgs if i.get("alt"))
+        result["images_total"] = len(imgs)
+        result["images_with_alt"] = imgs_with_alt
+        result["alt_text_score"] = round(
+            (imgs_with_alt / len(imgs) * 100) if imgs else 0, 1
+        )
+
+        # Page speed hints (rough: page size)
+        result["page_size_kb"] = round(len(html.encode()) / 1024, 1)
+
+        # Internal/external links
+        base_domain = re.sub(r"^https?://([^/]+).*", r"\1", url)
+        internal, external = 0, 0
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if href.startswith("/") or base_domain in href:
+                internal += 1
+            elif href.startswith("http"):
+                external += 1
+        result["links"] = {"internal": internal, "external": external}
+
+        # Contact info
+        phones = sorted(set(re.findall(
+            r"(?:\+?6?01\d[-\s]?\d{3,4}[-\s]?\d{4})"
+            r"|(?:\+?6?0[3-9][-.\\s]?\d{7,8})", html)))[:4]
+        emails = sorted(set(re.findall(
+            r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", html)))[:4]
+        result["contact"] = {"phones": phones, "emails": emails}
+
+        return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": f"analyze_competitor failed: {e}"})
+
+
+def social_monitor(query: str, max_results: int = 8) -> str:
+    """Monitor social mentions via DuckDuckGo search."""
+    try:
+        # Search across social platforms
+        platforms = ["twitter.com", "reddit.com", "facebook.com",
+                     "instagram.com", "tiktok.com"]
+        all_results = []
+
+        for platform in platforms[:3]:  # Top 3 platforms
+            query_site = f"site:{platform} {query}"
+            try:
+                results = _ddg_results(query_site, max_results=3)
+                for r in results:
+                    r["platform"] = platform.split(".")[0]
+                all_results.extend(results)
+            except Exception:
+                continue
+
+        # General mentions
+        general = _ddg_results(f"{query} review OR opinion OR mentioned", max_results=4)
+        for r in general:
+            r["platform"] = "web"
+        all_results.extend(general)
+
+        return json.dumps({
+            "query": query,
+            "mentions": all_results[:max_results],
+            "total_found": len(all_results),
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": f"social_monitor failed: {e}"})
+
+
+def seo_audit(url: str) -> str:
+    """Basic SEO audit: title, meta, headings, images, structure."""
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    try:
+        with httpx.Client(timeout=25, follow_redirects=True,
+                          headers={"User-Agent": USER_AGENT}) as client:
+            resp = client.get(url)
+            html = resp.text
+
+        soup = BeautifulSoup(html, "html.parser")
+        issues = []
+        checks = []
+
+        # Title
+        title = soup.title.get_text(strip=True) if soup.title else ""
+        if not title:
+            issues.append("No <title> tag found")
+        elif len(title) < 30:
+            issues.append(f"Title too short ({len(title)} chars, aim for 50-60)")
+        elif len(title) > 60:
+            issues.append(f"Title too long ({len(title)} chars, aim for 50-60)")
+        else:
+            checks.append(f"Title length OK ({len(title)} chars)")
+
+        # Meta description
+        desc = soup.find("meta", attrs={"name": "description"})
+        if not desc:
+            issues.append("No meta description found")
+        else:
+            d = desc.get("content", "")
+            if len(d) < 120:
+                issues.append(f"Meta description too short ({len(d)} chars)")
+            elif len(d) > 160:
+                issues.append(f"Meta description too long ({len(d)} chars)")
+            else:
+                checks.append(f"Meta description OK ({len(d)} chars)")
+
+        # H1 tags
+        h1s = soup.find_all("h1")
+        if len(h1s) == 0:
+            issues.append("No H1 tag found")
+        elif len(h1s) > 1:
+            issues.append(f"Multiple H1 tags ({len(h1s)})")
+        else:
+            checks.append("Single H1 tag present")
+
+        # Images without alt
+        imgs = soup.find_all("img")
+        no_alt = sum(1 for i in imgs if not i.get("alt"))
+        if no_alt > 0:
+            issues.append(f"{no_alt}/{len(imgs)} images missing alt text")
+        elif imgs:
+            checks.append("All images have alt text")
+
+        # Canonical link
+        canonical = soup.find("link", rel="canonical")
+        if not canonical:
+            issues.append("No canonical link tag")
+        else:
+            checks.append("Canonical link present")
+
+        # Open Graph tags
+        og_title = soup.find("meta", property="og:title")
+        og_desc = soup.find("meta", property="og:description")
+        og_image = soup.find("meta", property="og:image")
+        if not all([og_title, og_desc, og_image]):
+            missing = []
+            if not og_title: missing.append("og:title")
+            if not og_desc: missing.append("og:description")
+            if not og_image: missing.append("og:image")
+            issues.append(f"Missing Open Graph: {', '.join(missing)}")
+        else:
+            checks.append("Open Graph tags complete")
+
+        # Robots
+        robots = soup.find("meta", attrs={"name": "robots"})
+        if robots:
+            checks.append(f"Robots meta: {robots.get('content', '')}")
+
+        # Structured data (JSON-LD)
+        jsonld = soup.find_all("script", type="application/ld+json")
+        if jsonld:
+            checks.append(f"Structured data found ({len(jsonld)} blocks)")
+        else:
+            issues.append("No structured data (JSON-LD) found")
+
+        # Page size
+        size_kb = round(len(html.encode()) / 1024, 1)
+        if size_kb > 500:
+            issues.append(f"Large page size ({size_kb} KB)")
+        else:
+            checks.append(f"Page size OK ({size_kb} KB)")
+
+        return json.dumps({
+            "url": url,
+            "score": max(0, 100 - len(issues) * 10),
+            "issues": issues,
+            "checks": checks,
+            "title": title,
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": f"seo_audit failed: {e}"})
+
+
+def keyword_research(topic: str, max_results: int = 10) -> str:
+    """Research keywords related to a topic via DuckDuckGo suggestions."""
+    try:
+        # Get related searches
+        queries = [
+            f"{topic} how to",
+            f"{topic} tips",
+            f"{topic} tutorial",
+            f"{topic} guide",
+            f"{topic} Malaysia",
+            f"best {topic}",
+            f"{topic} vs",
+            f"{topic} review",
+        ]
+        all_results = []
+        seen = set()
+
+        for q in queries[:6]:
+            try:
+                results = _ddg_results(q, max_results=3)
+                for r in results:
+                    key = r["title"].lower()[:50]
+                    if key not in seen:
+                        seen.add(key)
+                        r["keyword"] = q
+                        all_results.append(r)
+            except Exception:
+                continue
+
+        return json.dumps({
+            "topic": topic,
+            "keywords_found": len(all_results),
+            "results": all_results[:max_results],
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": f"keyword_research failed: {e}"})
