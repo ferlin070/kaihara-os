@@ -232,13 +232,26 @@ export async function stopVoice(): Promise<any> {
   return res.json()
 }
 
-export async function speak(text: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/voice/speak`, {
+export async function speak(text: string, voice?: string): Promise<void> {
+  // Get audio from server (Edge Neural TTS — fluent Bahasa Malaysia)
+  const base = getApiBase()
+  const res = await fetch(`${base.replace('/api', '')}/api/voice/speak`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, voice }),
   })
-  return res.json()
+  if (!res.ok) throw new Error('TTS failed')
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(url)
+    audio.onended = () => {
+      URL.revokeObjectURL(url)
+      resolve()
+    }
+    audio.onerror = reject
+    audio.play()
+  })
 }
 
 // ============================================================

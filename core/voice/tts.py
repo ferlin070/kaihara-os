@@ -1,43 +1,91 @@
 """
-TTS - Text-to-Speech using Piper (local, free, natural voice).
-Piper: https://github.com/rhasspy/piper
-Falls back to pyttsx3 if Piper not available.
+TTS - Text-to-Speech with multiple engines.
+
+Priority:
+1. Edge Neural TTS (Microsoft) — natural, fluent Bahasa Malaysia
+   Voices: ms-MY-YasminNeural (female), ms-MY-OsmanNeural (male)
+2. Piper (local) — offline fallback
+3. Browser TTS — handled client-side
 """
 
 import os
 import subprocess
 import tempfile
+import hashlib
 from typing import Any
 
 
 class TTS:
-    """Piper-based text-to-speech. Local, free, natural voice."""
+    """Multi-engine text-to-speech. Edge Neural for quality Malay."""
+
+    # Voice presets: name -> edge voice id
+    VOICES = {
+        "yasmin": "ms-MY-YasminNeural",   # Female, fasih BM
+        "osman": "ms-MY-OsmanNeural",     # Male, fasih BM
+    }
 
     def __init__(self, voice: str = "en_US-lessig-medium",
                  piper_path: str = "piper"):
-        self.voice = voice
+        self.voice = voice  # piper model path (fallback)
         self.piper_path = piper_path
         self._pyttsx = None
+        self._cache_dir = tempfile.gettempdir()
+        self.default_voice = "yasmin"
 
-    def synthesize(self, text: str) -> dict:
-        """Synthesize text to speech audio bytes."""
+    async def synthesize_async(self, text: str,
+                                voice_name: str = None) -> dict:
+        """Synthesize using Edge Neural TTS (async)."""
         if not text.strip():
             return {"audio": b"", "error": "empty text"}
 
-        # Try Piper first
+        voice_id = self.VOICES.get(
+            voice_name or self.default_voice,
+            self.VOICES[self.default_voice]
+        )
+
+        # Cache by (voice, text hash)
+        key = hashlib.sha256(f"{voice_id}:{text}".encode()).hexdigest()[:16]
+        cache_path = os.path.join(self._cache_dir, f"kaihara_tts_{key}.mp3")
+
+        if os.path.exists(cache_path):
+            with open(cache_path, "rb") as f:
+                return {"audio": f.read(), "engine": "edge-neural",
+                        "format": "mp3", "voice": voice_id}
+
+        try:
+            import edge_tts
+            communicate = edge_tts.Communicate(text, voice_id)
+            await communicate.save(cache_path)
+            with open(cache_path, "rb") as f:
+                audio = f.read()
+            return {"audio": audio, "engine": "edge-neural",
+                    "format": "mp3", "voice": voice_id}
+        except Exception as e:
+            # Fallback to sync engines
+            result = self.synthesize(text)
+            if not result.get("audio"):
+                result["error"] = f"edge-tts failed: {e}"
+            return result
+
+    def synthesize(self, text: str) -> dict:
+        """Sync synthesis — Piper fallback."""
+        if not text.strip():
+            return {"audio": b"", "error": "empty text"}
+
+        # Try Piper first (sync fallback)
         audio = self._synthesize_piper(text)
         if audio:
-            return {"audio": audio, "engine": "piper"}
+            return {"audio": audio, "engine": "piper", "format": "wav"}
 
         # Fallback: pyttsx3
         audio = self._synthesize_pyttsx3(text)
         if audio:
-            return {"audio": audio, "engine": "pyttsx3"}
+            return {"audio": audio, "engine": "pyttsx3", "format": "wav"}
 
         return {
             "audio": b"",
             "error": ("No TTS engine available. "
-                      "Install Piper or pyttsx3.")
+                      "Install edge-tts or Piper.")
         }
 
     def _synthesize_piper(self, text: str) -> bytes | None:
@@ -91,7 +139,11 @@ class TTS:
 
     def is_available(self) -> bool:
         """Check if any TTS engine is available."""
-        # Check Piper
+        try:
+            import edge_tts  # noqa: F401
+            return True
+        except ImportError:
+            pass
         try:
             result = subprocess.run(
                 [self.piper_path, "--help"],
@@ -101,18 +153,9 @@ class TTS:
                 return True
         except (FileNotFoundError, Exception):
             pass
-        # Check pyttsx3
         try:
-            import pyttsx3
+            import pyttsx3  # noqa: F401
             return True
         except ImportError:
             pass
         return False
-
-    def status(self) -> dict:
-        return {
-            "engine": "piper",
-            "voice": self.voice,
-            "available": self.is_available(),
-            "fallback": "pyttsx3",
-        }

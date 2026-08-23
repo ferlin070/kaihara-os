@@ -60,7 +60,7 @@ export default function Conversation({
     }
   }, [])
 
-  // Speak new Kaihara replies using browser TTS when enabled
+  // Speak new Kaihara replies using server neural TTS when enabled
   const lastCountRef = useRef(0)
   useEffect(() => {
     if (!speakReplies) {
@@ -69,13 +69,8 @@ export default function Conversation({
     }
     if (messages.length > lastCountRef.current && !thinking) {
       const last = messages[messages.length - 1]
-      if (last?.role === 'kaihara' && 'speechSynthesis' in window) {
-        // Strip markdown symbols for cleaner speech
-        const clean = last.text.replace(/[*_`#>\[\]]/g, '').slice(0, 500)
-        window.speechSynthesis.cancel()
-        const u = new SpeechSynthesisUtterance(clean)
-        u.lang = 'ms-MY'
-        window.speechSynthesis.speak(u)
+      if (last?.role === 'kaihara' && last.text) {
+        speak(last.text).catch(() => {})
       }
     }
     lastCountRef.current = messages.length
@@ -125,17 +120,7 @@ export default function Conversation({
     setInterim('')
   }
 
-  const handleSpeak = (text: string) => {
-    if ('speechSynthesis' in window) {
-      const clean = text.replace(/[*_`#>\[\]]/g, '').slice(0, 500)
-      window.speechSynthesis.cancel()
-      const u = new SpeechSynthesisUtterance(clean)
-      u.lang = 'ms-MY'
-      window.speechSynthesis.speak(u)
-    } else {
-      speak(text).catch(() => {})
-    }
-  }
+  const handleSpeak = (text: string) => speak(text).catch(() => {})
 
   const voiceAvailable = voiceStatus?.tts?.available
 

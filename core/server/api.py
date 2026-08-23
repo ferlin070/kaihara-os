@@ -296,18 +296,47 @@ def create_app(command_center) -> FastAPI:
 
     @app.post("/api/voice/speak")
     async def voice_speak(payload: dict):
-        """Speak text via TTS."""
+        """Speak text via TTS. Returns audio/mpeg stream (Edge Neural)."""
         voice = getattr(command_center, "_voice", None)
         if not voice:
             return {"error": "Voice not initialized"}
         text = payload.get("text", "")
         if not text:
             return {"error": "No text provided"}
-        result = voice.tts.synthesize(text)
+        voice_name = payload.get("voice")  # yasmin | osman
+        # Strip markdown for cleaner speech
+        import re as _re
+        clean = _re.sub(r"```[\s\S]*?```", " kod. ", text)
+        clean = _re.sub(r"[*_`#>\[\]]", "", clean)
+        clean = _re.sub(r"\s+", " ", clean).strip()[:800]
+
+        from fastapi.responses import Response
+        result = await voice.tts.synthesize_async(clean, voice_name)
+        audio = result.get("audio", b"")
+        if not audio:
+            return {"error": result.get("error", "TTS failed")}
+        return Response(
+            content=audio,
+            media_type="audio/mpeg"
+            if result.get("format") == "mp3"
+            else "audio/wav",
+            headers={
+                "X-TTS-Engine": result.get("engine", "none"),
+                "X-TTS-Voice": result.get("voice", ""),
+            },
+        )
+
+    @app.get("/api/voice/voices")
+    async def voice_voices():
+        """List available neural voices."""
         return {
-            "engine": result.get("engine", "none"),
-            "audio_size": len(result.get("audio", b"")),
-            "error": result.get("error"),
+            "voices": [
+                {"id": "yasmin", "name": "Yasmin",
+                 "lang": "ms-MY", "gender": "female"},
+                {"id": "osman", "name": "Osman",
+                 "lang": "ms-MY", "gender": "male"},
+            ],
+            "default": "yasmin",
         }
 
     # ============================================================
