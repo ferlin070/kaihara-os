@@ -220,15 +220,8 @@ async def cli_chat(cc: CommandCenter):
 
 
 def run_server(cc: CommandCenter):
-    """Start FastAPI server + OS kernel agents."""
+    """Start FastAPI server. Kernel + channels start via app startup event."""
     import uvicorn
-    import asyncio as _aio
-
-    # Start OS kernel agents in background
-    kernel = getattr(cc, "_kernel", None)
-    if kernel:
-        _aio.get_event_loop().create_task(kernel.start_all())
-        logger.info("OS Kernel: 7 agents starting in background")
 
     app = create_app(cc)
     host = cc.config.get("server", {}).get("host", "0.0.0.0")

@@ -35,6 +35,25 @@ def create_app(command_center) -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.on_event("startup")
+    async def startup_tasks():
+        """Start kernel + channels inside the running event loop."""
+        import asyncio
+        import logging
+        log = logging.getLogger("kaihara.startup")
+        kernel = getattr(command_center, "_kernel", None)
+        if kernel:
+            asyncio.create_task(kernel.start_all())
+            log.info("OS Kernel: 7 agents starting")
+        channels = getattr(command_center, "_channel_manager", None)
+        if channels:
+            results = await channels.start_all()
+            for name, res in results.items():
+                if "error" in res:
+                    log.warning(f"Channel {name}: {res['error']}")
+                else:
+                    log.info(f"Channel {name}: started")
+
     @app.get("/")
     async def root():
         return {

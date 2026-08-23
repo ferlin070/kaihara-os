@@ -4,6 +4,7 @@ Uses python-telegram-bot library. Two-way: receive + send.
 """
 
 import asyncio
+import os
 from typing import Any
 
 from core.channels.base import BaseChannel
@@ -16,7 +17,14 @@ class TelegramChannel(BaseChannel):
 
     def __init__(self, config: dict, command_center=None):
         super().__init__(config, command_center)
-        self.bot_token = config.get("bot_token") or ""
+        # Token: config first, then env var fallback
+        self.bot_token = config.get("bot_token") or os.environ.get(
+            "TELEGRAM_BOT_TOKEN", "")
+        # Security: only allow listed chat IDs (empty = allow all, not recommended)
+        raw_ids = config.get("allowed_chat_ids", [])
+        if isinstance(raw_ids, str):
+            raw_ids = [i.strip() for i in raw_ids.split(",") if i.strip()]
+        self.allowed_chat_ids = {str(i) for i in raw_ids}
         self._bot = None
         self._app = None
         self._task = None
@@ -43,14 +51,35 @@ class TelegramChannel(BaseChannel):
             self._app = Application.builder().token(self.bot_token).build()
 
             async def handle_message(update: Update, context):
-                if update.message and update.message.text:
-                    raw = {
-                        "chat_id": update.message.chat_id,
-                        "text": update.message.text,
-                        "username": update.message.from_user.username
-                            if update.message.from_user else "unknown",
-                    }
+                if not (update.message and update.message.text):
+                    return
+                chat_id = str(update.message.chat_id)
+                # Security: enforce allowlist
+                if self.allowed_chat_ids and chat_id not in self.allowed_chat_ids:
+                    await update.message.reply_text(
+                        "⛔ Unauthorized. This bot is private."
+                    )
+                    return
+                raw = {
+                    "chat_id": update.message.chat_id,
+                    "text": update.message.text,
+                    "username": update.message.from_user.username
+                        if update.message.from_user else "unknown",
+                }
+                # Send typing indicator while thinking
+                async def _typing():
+                    try:
+                        while True:
+                            await self._app.bot.send_chat_action(
+                                chat_id=int(chat_id), action="typing")
+                            await asyncio.sleep(4)
+                    except asyncio.CancelledError:
+                        pass
+                typing_task = asyncio.create_task(_typing())
+                try:
                     await self.receive(raw)
+                finally:
+                    typing_task.cancel()
 
             self._app.add_handler(
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
@@ -103,4 +132,6 @@ class TelegramChannel(BaseChannel):
             **super().status(),
             "has_token": bool(self.bot_token),
             "bot_connected": self._app is not None,
+            "allowed_users": len(self.allowed_chat_ids),
+            "locked": bool(self.allowed_chat_ids),
         }
