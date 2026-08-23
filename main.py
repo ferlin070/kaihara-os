@@ -179,7 +179,7 @@ def init_kaihara() -> CommandCenter:
         config={**config, "soul_dir": str(ROOT / "config" / "soul")},
         memory=memory,
         audit=cc._audit,
-        skill_registry=skill_registry,
+        skill_registry=cc._skill_registry,
     )
     FleetManager.register("marketing", MarketingAgent)
 
