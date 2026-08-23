@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import KaiharaStatus from './components/KaiharaStatus'
 import Conversation from './components/Conversation'
 import AgentActivity from './components/AgentActivity'
@@ -25,9 +25,12 @@ export default function App() {
   const [notifications, setNotifications] = useState<{type: string; text: string}[]>([])
   const [activeTab, setActiveTab] = useState<'chat' | 'map' | 'tasks' | 'skills' | 'security' | 'memory'>('chat')
 
+  const failCountRef = useRef(0)
+
   const fetchStatus = useCallback(async () => {
     try {
       const s = await getStatus()
+      failCountRef.current = 0
       setStatus(s)
       if (s.fleet_agents) {
         const mapData = await getMapState()
@@ -37,7 +40,11 @@ export default function App() {
         })
         setAgents(agentStatus)
       }
-    } catch { setStatus(null) }
+    } catch {
+      // Keep last known status — only show OFFLINE after 4 consecutive failures (~1 min)
+      failCountRef.current += 1
+      if (failCountRef.current >= 4) setStatus(null)
+    }
   }, [])
 
   useEffect(() => {
