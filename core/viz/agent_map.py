@@ -14,24 +14,32 @@ from typing import Any
 class AgentMap:
     """Track agent positions, movements, and interactions for visualization."""
 
-    # Station positions (x, y) on a 800x600 canvas
+    # Town buildings (x, y = center of building on 800x600 canvas)
     STATIONS = {
-        "command_center": {"x": 400, "y": 300, "label": "Command Center",
-                            "icon": "CC", "color": "#3b82f6"},
-        "coding_desk": {"x": 150, "y": 150, "label": "Coding Desk",
-                         "icon": "CD", "color": "#10b981"},
-        "security_terminal": {"x": 650, "y": 150, "label": "Security Terminal",
-                               "icon": "ST", "color": "#ef4444"},
-        "marketing_hub": {"x": 150, "y": 450, "label": "Marketing Hub",
-                           "icon": "MK", "color": "#f59e0b"},
-        "deploy_station": {"x": 650, "y": 450, "label": "Deploy Station",
-                            "icon": "DP", "color": "#8b5cf6"},
-        "research_desk": {"x": 400, "y": 100, "label": "Research Desk",
-                           "icon": "RD", "color": "#06b6d4"},
-        "storage_vault": {"x": 400, "y": 500, "label": "Storage Vault",
-                           "icon": "SV", "color": "#6b7280"},
-        "meta_observatory": {"x": 700, "y": 300, "label": "Meta Observatory",
-                              "icon": "MT", "color": "#ec4899"},
+        "command_center": {"x": 400, "y": 280, "w": 100, "h": 80,
+                            "label": "Command Center", "type": "hq",
+                            "color": "#3b82f6"},
+        "coding_desk": {"x": 130, "y": 130, "w": 90, "h": 70,
+                         "label": "Coding Lab", "type": "lab",
+                         "color": "#10b981"},
+        "security_terminal": {"x": 670, "y": 130, "w": 90, "h": 70,
+                               "label": "Security HQ", "type": "fort",
+                               "color": "#ef4444"},
+        "marketing_hub": {"x": 130, "y": 470, "w": 90, "h": 70,
+                           "label": "Market", "type": "shop",
+                           "color": "#f59e0b"},
+        "deploy_station": {"x": 670, "y": 470, "w": 90, "h": 70,
+                            "label": "Deploy Bay", "type": "garage",
+                            "color": "#8b5cf6"},
+        "research_desk": {"x": 400, "y": 80, "w": 90, "h": 60,
+                           "label": "Library", "type": "library",
+                           "color": "#06b6d4"},
+        "storage_vault": {"x": 400, "y": 520, "w": 90, "h": 60,
+                           "label": "Vault", "type": "warehouse",
+                           "color": "#6b7280"},
+        "meta_observatory": {"x": 730, "y": 300, "w": 70, "h": 70,
+                              "label": "Observatory", "type": "tower",
+                              "color": "#ec4899"},
     }
 
     # Agent home stations (where they start)

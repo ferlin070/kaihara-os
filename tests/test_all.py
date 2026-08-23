@@ -22,6 +22,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
+# Load .env file for tests
+try:
+    from dotenv import load_dotenv
+    env_path = os.path.join(ROOT, ".env")
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+except ImportError:
+    pass
+
 PASS = 0
 FAIL = 0
 ERRORS = []

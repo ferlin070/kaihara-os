@@ -468,8 +468,11 @@ export interface MapAgent {
 export interface MapStation {
   x: number
   y: number
+  w?: number
+  h?: number
   label: string
   icon: string
+  type?: string
   color: string
 }
 

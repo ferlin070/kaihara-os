@@ -30,22 +30,14 @@ export default function App() {
       const s = await getStatus()
       setStatus(s)
       if (s.fleet_agents) {
-        // Fetch real agent status from agent map
         const mapData = await getMapState()
         const agentStatus = s.fleet_agents.map(name => {
           const mapAgent = mapData.agents[name]
-          return {
-            name,
-            status: mapAgent?.status || 'idle',
-            task: mapAgent?.task || '',
-            progress: mapAgent?.progress || 0,
-          }
+          return { name, status: mapAgent?.status || 'idle', task: mapAgent?.task || '', progress: mapAgent?.progress || 0 }
         })
         setAgents(agentStatus)
       }
-    } catch {
-      setStatus(null)
-    }
+    } catch { setStatus(null) }
   }, [])
 
   useEffect(() => {
@@ -59,29 +51,20 @@ export default function App() {
     setThinking(true)
     try {
       const res = await sendMessage(text)
-      setMessages(prev => [...prev, {
-        role: 'kaihara',
-        text: res.response,
-        route: res.route,
-      }])
+      setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route }])
     } catch {
-      setMessages(prev => [...prev, {
-        role: 'kaihara',
-        text: '[Connection error. Is Kaihara server running on :7000?]',
-      }])
+      setMessages(prev => [...prev, { role: 'kaihara', text: '[Connection error. Is Kaihara server running on :7000?]' }])
     }
     setThinking(false)
   }
 
   return (
-    <div className="min-h-screen bg-kaihara-bg text-kaihara-text">
-      {/* Header */}
-      <header className="border-b border-kaihara-border px-6 py-3 flex items-center justify-between">
+    // Root: full viewport, NO scroll on body
+    <div className="h-screen flex flex-col bg-kaihara-bg text-kaihara-text overflow-hidden">
+      {/* Header — fixed height */}
+      <header className="flex-shrink-0 border-b border-kaihara-border px-6 py-2.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-kaihara-primary to-kaihara-accent
-                          flex items-center justify-center text-white font-bold text-sm">
-            K
-          </div>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-sm">K</div>
           <div>
             <h1 className="text-lg font-bold tracking-wide">KAIHARA OS</h1>
             <p className="text-xs text-kaihara-muted">Personal AI Super-Intelligence</p>
@@ -90,22 +73,20 @@ export default function App() {
         <div className="flex items-center gap-4">
           {status?.kaihara_online ? (
             <span className="flex items-center gap-2 text-xs text-kaihara-success">
-              <span className="status-dot bg-kaihara-success animate-pulse" />
-              ONLINE
+              <span className="status-dot bg-kaihara-success animate-pulse" />ONLINE
             </span>
           ) : (
             <span className="flex items-center gap-2 text-xs text-kaihara-danger">
-              <span className="status-dot bg-kaihara-danger" />
-              OFFLINE
+              <span className="status-dot bg-kaihara-danger" />OFFLINE
             </span>
           )}
         </div>
       </header>
 
-      {/* Main Layout */}
-      <div className="flex h-[calc(100vh-57px)]">
-        {/* Left Sidebar */}
-        <aside className="w-64 border-r border-kaihara-border p-3 overflow-y-auto space-y-3">
+      {/* Main — fills remaining height, NO page scroll */}
+      <div className="flex-1 flex min-h-0">
+        {/* Left Sidebar — scroll dalam diri sendiri */}
+        <aside className="w-64 flex-shrink-0 border-r border-kaihara-border p-3 overflow-y-auto space-y-3">
           <KaiharaStatus thinking={thinking} online={!!status?.kaihara_online} />
           <ChannelStatus />
           <KernelStatus />
@@ -114,38 +95,33 @@ export default function App() {
           <AgentActivity agents={agents} />
         </aside>
 
-        {/* Center — Tabbed */}
-        <main className="flex-1 flex flex-col">
-          {/* Tabs */}
-          <div className="flex border-b border-kaihara-border">
+        {/* Center — flex-1, tab content manages own scroll */}
+        <main className="flex-1 flex flex-col min-w-0">
+          {/* Tabs — fixed height */}
+          <div className="flex-shrink-0 flex border-b border-kaihara-border">
             {(['chat', 'map', 'tasks', 'skills', 'security', 'memory'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
-                  activeTab === tab
-                    ? 'text-kaihara-accent border-b-2 border-kaihara-accent'
-                    : 'text-kaihara-muted hover:text-kaihara-text'
-                }`}
-              >
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                className={`px-5 py-2.5 text-sm font-medium uppercase tracking-wide transition-colors ${
+                  activeTab === tab ? 'text-kaihara-accent border-b-2 border-kaihara-accent' : 'text-kaihara-muted hover:text-kaihara-text'
+                }`}>
                 {tab}
               </button>
             ))}
           </div>
 
-          {/* Tab Content */}
-          {activeTab === 'chat' && (
-            <Conversation messages={messages} thinking={thinking} onSend={handleSend} />
-          )}
-          {activeTab === 'map' && <AgentMap />}
-          {activeTab === 'tasks' && <TaskBoard />}
-          {activeTab === 'skills' && <SkillBrowser />}
-          {activeTab === 'security' && <SecurityView />}
-          {activeTab === 'memory' && <MemoryView />}
+          {/* Tab content — fills remaining, each tab manages own scroll */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            {activeTab === 'chat' && <Conversation messages={messages} thinking={thinking} onSend={handleSend} />}
+            {activeTab === 'map' && <AgentMap />}
+            {activeTab === 'tasks' && <TaskBoard />}
+            {activeTab === 'skills' && <SkillBrowser />}
+            {activeTab === 'security' && <SecurityView />}
+            {activeTab === 'memory' && <MemoryView />}
+          </div>
         </main>
 
-        {/* Right Sidebar */}
-        <aside className="w-72 border-l border-kaihara-border p-3 overflow-y-auto space-y-3">
+        {/* Right Sidebar — scroll dalam diri sendiri */}
+        <aside className="w-72 flex-shrink-0 border-l border-kaihara-border p-3 overflow-y-auto space-y-3">
           <MorningBriefing />
           <GoalsTracker />
           <NotificationPanel notifications={notifications} />
@@ -155,18 +131,13 @@ export default function App() {
   )
 }
 
-// Simple memory view placeholder
 function MemoryView() {
   return (
     <div className="flex-1 p-6 overflow-y-auto">
       <h2 className="hud-title">Memory Tree</h2>
       <div className="hud-panel">
-        <p className="text-kaihara-muted text-sm">
-          Memory viewer — search and browse stored memories.
-        </p>
-        <p className="text-kaihara-muted text-xs mt-2">
-          Use /api/memory/recall?q=your_query to search.
-        </p>
+        <p className="text-kaihara-muted text-sm">Memory viewer — search and browse stored memories.</p>
+        <p className="text-kaihara-muted text-xs mt-2">Use /api/memory/recall?q=your_query to search.</p>
       </div>
     </div>
   )
