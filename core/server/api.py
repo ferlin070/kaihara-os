@@ -46,6 +46,13 @@ def create_app(command_center) -> FastAPI:
         if kernel:
             asyncio.create_task(kernel.start_all())
             log.info("OS Kernel: 7 agents starting")
+
+        # Start daemon watchdog
+        daemon = getattr(command_center, "_daemon_manager", None)
+        if daemon:
+            asyncio.create_task(daemon.start_watchdog())
+            log.info("Daemon Manager: watchdog started")
+
         channels = getattr(command_center, "_channel_manager", None)
         if channels:
             results = await channels.start_all()
@@ -972,6 +979,59 @@ def create_app(command_center) -> FastAPI:
         if not kernel:
             return {"error": "Kernel not initialized"}
         return {"agents": kernel.list_agents()}
+
+    # ============================================================
+    # Daemon Manager endpoints
+    # ============================================================
+
+    @app.get("/api/daemon/status")
+    async def daemon_status():
+        daemon = getattr(command_center, "_daemon_manager", None)
+        if not daemon:
+            return {"error": "Daemon manager not initialized"}
+        return daemon.status()
+
+    @app.get("/api/daemon/alerts")
+    async def daemon_alerts():
+        daemon = getattr(command_center, "_daemon_manager", None)
+        if not daemon:
+            return {"error": "Daemon manager not initialized"}
+        return {"alerts": daemon.get_alerts()}
+
+    @app.get("/api/daemon/services")
+    async def daemon_services():
+        daemon = getattr(command_center, "_daemon_manager", None)
+        if not daemon:
+            return {"error": "Daemon manager not initialized"}
+        return {"services": daemon.get_service_registry()}
+
+    @app.post("/api/daemon/watchdog/start")
+    async def daemon_watchdog_start():
+        daemon = getattr(command_center, "_daemon_manager", None)
+        if not daemon:
+            return {"error": "Daemon manager not initialized"}
+        return await daemon.start_watchdog()
+
+    @app.post("/api/daemon/watchdog/stop")
+    async def daemon_watchdog_stop():
+        daemon = getattr(command_center, "_daemon_manager", None)
+        if not daemon:
+            return {"error": "Daemon manager not initialized"}
+        return await daemon.stop_watchdog()
+
+    @app.post("/api/daemon/restart/{name}")
+    async def daemon_restart_agent(name: str):
+        daemon = getattr(command_center, "_daemon_manager", None)
+        if not daemon:
+            return {"error": "Daemon manager not initialized"}
+        return await daemon.restart_agent(name)
+
+    @app.post("/api/daemon/restart-all")
+    async def daemon_restart_all():
+        daemon = getattr(command_center, "_daemon_manager", None)
+        if not daemon:
+            return {"error": "Daemon manager not initialized"}
+        return await daemon.restart_all()
 
     # ============================================================
     # Meta Agent endpoints

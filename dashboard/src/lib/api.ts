@@ -633,6 +633,72 @@ export async function runKernelOnce(name: string): Promise<any> {
 }
 
 // ============================================================
+// Daemon Manager
+// ============================================================
+
+export interface DaemonAlert {
+  agent: string
+  type: string
+  message: string
+  severity: string
+}
+
+export interface ServiceInfo {
+  name: string
+  type: string
+  running: boolean
+  interval: number
+  last_run: string | null
+  run_count: number
+  error: string | null
+  restarts: number
+}
+
+export interface DaemonStatus {
+  watchdog_running: boolean
+  agents: { total: number; running: number; errored: number; stopped: number }
+  process: { pid: number; cpu_percent: number; memory_mb: number; threads: number; uptime_seconds: number }
+  services: ServiceInfo[]
+  restart_history: any[]
+  restart_counts: Record<string, number>
+}
+
+export async function getDaemonStatus(): Promise<DaemonStatus> {
+  const res = await fetch(`${API_BASE}/daemon/status`)
+  return res.json()
+}
+
+export async function getDaemonAlerts(): Promise<{ alerts: DaemonAlert[] }> {
+  const res = await fetch(`${API_BASE}/daemon/alerts`)
+  return res.json()
+}
+
+export async function getDaemonServices(): Promise<{ services: ServiceInfo[] }> {
+  const res = await fetch(`${API_BASE}/daemon/services`)
+  return res.json()
+}
+
+export async function startDaemonWatchdog(): Promise<any> {
+  const res = await fetch(`${API_BASE}/daemon/watchdog/start`, { method: 'POST' })
+  return res.json()
+}
+
+export async function stopDaemonWatchdog(): Promise<any> {
+  const res = await fetch(`${API_BASE}/daemon/watchdog/stop`, { method: 'POST' })
+  return res.json()
+}
+
+export async function restartDaemonAgent(name: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/daemon/restart/${name}`, { method: 'POST' })
+  return res.json()
+}
+
+export async function restartAllDaemonAgents(): Promise<any> {
+  const res = await fetch(`${API_BASE}/daemon/restart-all`, { method: 'POST' })
+  return res.json()
+}
+
+// ============================================================
 // Meta Agent
 // ============================================================
 

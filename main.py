@@ -133,6 +133,10 @@ def init_kaihara() -> CommandCenter:
     from core.os.kernel import KernelManager
     cc._kernel = KernelManager(config, audit=cc._audit)
 
+    # Daemon Manager (watchdog + auto-restart)
+    from core.os.daemon_manager import DaemonManager
+    cc._daemon_manager = DaemonManager(cc._kernel, config.get("daemon", {}))
+
     # Agent Map (visualization, ai-town style)
     from core.viz.agent_map import AgentMap
     cc._agent_map = AgentMap()
