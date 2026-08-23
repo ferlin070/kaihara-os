@@ -61,6 +61,7 @@ class AgentMap:
 
     def _init_agents(self):
         """Initialize all agents at their home stations."""
+        import random
         for agent, station in self.AGENT_HOMES.items():
             home = self.STATIONS[station]
             self.agents[agent] = {
@@ -77,6 +78,14 @@ class AgentMap:
                 "color": home["color"],
                 "moving": False,
                 "progress": 0,
+                "wander_timer": random.uniform(3, 10),
+                "wander_count": 0,
+                "wander_limit": random.randint(2, 5),
+                "anim_state": "idle",
+                "anim_frame": 0,
+                "anim_timer": 0,
+                "direction": "down",
+                "last_update": time.time(),
             }
 
     def move_agent(self, agent: str, station: str,
@@ -147,10 +156,16 @@ class AgentMap:
             self.events = self.events[-200:]
 
     def tick(self):
-        """Update agent positions (move towards target)."""
+        """Update agent positions + idle wander + animation states."""
+        import random
         now = time.time()
+        dt = 0.1  # approx 100ms per tick
+
         for agent in self.agents.values():
-            # Move towards target
+            elapsed = now - agent.get("last_update", now)
+            agent["last_update"] = now
+
+            # Movement towards target
             if agent["moving"]:
                 dx = agent["target_x"] - agent["x"]
                 dy = agent["target_y"] - agent["y"]
@@ -160,10 +175,65 @@ class AgentMap:
                     agent["y"] = agent["target_y"]
                     agent["moving"] = False
                     agent["status"] = "working"
+                    agent["anim_state"] = "type"
+                    agent["anim_frame"] = 0
                 else:
                     speed = 30
                     agent["x"] += (dx / dist) * speed
                     agent["y"] += (dy / dist) * speed
+                    agent["anim_state"] = "walk"
+                    # Determine direction
+                    if abs(dx) > abs(dy):
+                        agent["direction"] = "right" if dx > 0 else "left"
+                    else:
+                        agent["direction"] = "down" if dy > 0 else "up"
+
+            # Idle wander (pixel-agents style)
+            elif agent["status"] == "idle" and not agent["moving"]:
+                agent["wander_timer"] -= elapsed
+                if agent["wander_timer"] <= 0:
+                    if agent["wander_count"] >= agent["wander_limit"]:
+                        # Return to home station
+                        home = self.STATIONS.get(agent["station"], {})
+                        if home:
+                            agent["target_x"] = home["x"]
+                            agent["target_y"] = home["y"]
+                            agent["moving"] = True
+                            agent["anim_state"] = "walk"
+                        agent["wander_count"] = 0
+                        agent["wander_limit"] = random.randint(2, 5)
+                        agent["wander_timer"] = random.uniform(5, 15)
+                    else:
+                        # Wander to random nearby position
+                        offset_x = random.randint(-60, 60)
+                        offset_y = random.randint(-40, 40)
+                        agent["target_x"] = agent["x"] + offset_x
+                        agent["target_y"] = agent["y"] + offset_y
+                        agent["moving"] = True
+                        agent["anim_state"] = "walk"
+                        agent["wander_count"] += 1
+                        agent["wander_timer"] = random.uniform(2, 6)
+                else:
+                    # Standing idle — play idle animation
+                    agent["anim_state"] = "idle"
+
+            elif agent["status"] == "working" and not agent["moving"]:
+                agent["anim_state"] = "type"
+
+            # Animation frame update
+            agent["anim_timer"] += elapsed
+            if agent["anim_timer"] >= 0.18:
+                agent["anim_timer"] = 0
+                state = agent["anim_state"]
+                if state == "walk":
+                    agent["anim_frame"] = (agent["anim_frame"] + 1) % 3
+                elif state == "type":
+                    agent["anim_frame"] = (agent["anim_frame"] + 1) % 2
+                elif state == "read":
+                    agent["anim_frame"] = (agent["anim_frame"] + 1) % 2
+                elif state == "idle":
+                    agent["anim_frame"] = 0
+
             # Clear expired speech
             if agent["speech"] and now > agent["speech_expires"]:
                 agent["speech"] = ""
@@ -186,6 +256,9 @@ class AgentMap:
                 "color": a["color"],
                 "moving": a["moving"],
                 "progress": a["progress"],
+                "anim_state": a.get("anim_state", "idle"),
+                "anim_frame": a.get("anim_frame", 0),
+                "direction": a.get("direction", "down"),
             } for name, a in self.agents.items()},
             "stations": self.STATIONS,
             "events": self.events[-20:],
