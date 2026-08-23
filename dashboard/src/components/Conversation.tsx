@@ -2,6 +2,29 @@ import React, { useState, useRef, useEffect } from 'react'
 import type { Msg } from '../App'
 import { getVoiceStatus, speak, type VoiceStatus } from '../lib/api'
 
+// Web Speech API types
+interface SpeechRecognitionLike {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  start(): void
+  stop(): void
+  onresult: ((e: any) => void) | null
+  onerror: ((e: any) => void) | null
+  onend: (() => void) | null
+}
+
+function getRecognition(): SpeechRecognitionLike | null {
+  const w = window as any
+  const SR = w.SpeechRecognition || w.webkitSpeechRecognition
+  if (!SR) return null
+  const rec = new SR()
+  rec.lang = 'ms-MY'
+  rec.continuous = false
+  rec.interimResults = true
+  return rec
+}
+
 export default function Conversation({
   messages,
   thinking,
@@ -13,8 +36,15 @@ export default function Conversation({
 }) {
   const [input, setInput] = useState('')
   const [listening, setListening] = useState(false)
+  const [interim, setInterim] = useState('')
+  const [speakReplies, setSpeakReplies] = useState(false)
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null)
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const sttAvailable =
+    typeof window !== 'undefined' &&
+    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
 
   // Scroll only within chat container, not the page
   useEffect(() => {
@@ -25,11 +55,31 @@ export default function Conversation({
 
   useEffect(() => {
     getVoiceStatus().then(setVoiceStatus).catch(() => {})
-    const interval = setInterval(() => {
-      getVoiceStatus().then(setVoiceStatus).catch(() => {})
-    }, 30000)
-    return () => clearInterval(interval)
+    return () => {
+      recognitionRef.current?.stop()
+    }
   }, [])
+
+  // Speak new Kaihara replies using browser TTS when enabled
+  const lastCountRef = useRef(0)
+  useEffect(() => {
+    if (!speakReplies) {
+      lastCountRef.current = messages.length
+      return
+    }
+    if (messages.length > lastCountRef.current && !thinking) {
+      const last = messages[messages.length - 1]
+      if (last?.role === 'kaihara' && 'speechSynthesis' in window) {
+        // Strip markdown symbols for cleaner speech
+        const clean = last.text.replace(/[*_`#>\[\]]/g, '').slice(0, 500)
+        window.speechSynthesis.cancel()
+        const u = new SpeechSynthesisUtterance(clean)
+        u.lang = 'ms-MY'
+        window.speechSynthesis.speak(u)
+      }
+    }
+    lastCountRef.current = messages.length
+  }, [messages, thinking, speakReplies])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,10 +88,56 @@ export default function Conversation({
     setInput('')
   }
 
-  const toggleVoice = () => setListening(!listening)
-  const handleSpeak = (text: string) => speak(text).catch(() => {})
+  const startListening = () => {
+    const rec = getRecognition()
+    if (!rec) return
+    recognitionRef.current = rec
+
+    rec.onresult = (e: any) => {
+      let finalText = ''
+      let interimText = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript
+        if (e.results[i].isFinal) finalText += t
+        else interimText += t
+      }
+      setInterim(interimText)
+      if (finalText.trim()) {
+        setInterim('')
+        onSend(finalText.trim())
+      }
+    }
+    rec.onerror = () => setListening(false)
+    rec.onend = () => {
+      setListening(false)
+      setInterim('')
+    }
+
+    try {
+      rec.start()
+      setListening(true)
+    } catch {}
+  }
+
+  const stopListening = () => {
+    recognitionRef.current?.stop()
+    setListening(false)
+    setInterim('')
+  }
+
+  const handleSpeak = (text: string) => {
+    if ('speechSynthesis' in window) {
+      const clean = text.replace(/[*_`#>\[\]]/g, '').slice(0, 500)
+      window.speechSynthesis.cancel()
+      const u = new SpeechSynthesisUtterance(clean)
+      u.lang = 'ms-MY'
+      window.speechSynthesis.speak(u)
+    } else {
+      speak(text).catch(() => {})
+    }
+  }
+
   const voiceAvailable = voiceStatus?.tts?.available
-  const sttAvailable = voiceStatus?.stt?.available
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -50,19 +146,23 @@ export default function Conversation({
         <div className="flex-shrink-0 px-4 py-1.5 border-b border-kaihara-border flex items-center justify-between text-xs">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5">
-              <span className={`status-dot ${voiceStatus.stt.available ? 'bg-kaihara-success' : 'bg-kaihara-danger'}`} />
-              STT: {voiceStatus.stt.engine}
+              <span className={`status-dot ${sttAvailable ? 'bg-kaihara-success' : voiceStatus.stt.available ? 'bg-kaihara-success' : 'bg-kaihara-danger'}`} />
+              STT: {sttAvailable ? 'browser' : voiceStatus.stt.engine}
             </span>
             <span className="flex items-center gap-1.5">
               <span className={`status-dot ${voiceStatus.tts.available ? 'bg-kaihara-success' : 'bg-kaihara-danger'}`} />
               TTS: {voiceStatus.tts.engine}
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className={`status-dot ${voiceStatus.wake.available ? 'bg-kaihara-success' : 'bg-kaihara-warning'}`} />
-              Wake: "{voiceStatus.wake_word}"
-            </span>
           </div>
-          <span className="text-kaihara-muted">{voiceStatus.listening ? 'LISTENING' : 'idle'}</span>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={speakReplies}
+              onChange={(e) => setSpeakReplies(e.target.checked)}
+              className="accent-kaihara-accent"
+            />
+            Auto-speak replies
+          </label>
         </div>
       )}
 
@@ -75,7 +175,7 @@ export default function Conversation({
                 K
               </div>
               <p className="text-kaihara-muted text-sm">Kaihara online. How can I help?</p>
-              {voiceAvailable && <p className="text-kaihara-muted text-xs mt-2">Click the microphone to speak.</p>}
+              {sttAvailable && <p className="text-kaihara-muted text-xs mt-2">Click MIC and speak — works from any device.</p>}
             </div>
           </div>
         )}
@@ -99,9 +199,9 @@ export default function Conversation({
                 <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
                 {msg.route && <p className="text-xs opacity-60 mt-1.5">route: {msg.route}</p>}
               </div>
-              {msg.role === 'kaihara' && voiceAvailable && msg.text && (
+              {msg.role === 'kaihara' && msg.text && (
                 <button onClick={() => handleSpeak(msg.text)} className="mt-1 ml-1 text-xs text-kaihara-muted hover:text-kaihara-accent transition-colors">
-                  Say it
+                  🔊 Say it
                 </button>
               )}
             </div>
@@ -127,13 +227,15 @@ export default function Conversation({
       {/* Input — fixed di bawah */}
       <div className="flex-shrink-0 border-t border-kaihara-border p-3 bg-kaihara-bg">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
-          <button type="button" onClick={toggleVoice} className={`flex-shrink-0 p-2.5 rounded-lg transition-colors ${
-            listening ? 'bg-kaihara-danger text-white animate-pulse' : sttAvailable ? 'bg-kaihara-border text-kaihara-muted hover:text-kaihara-accent' : 'bg-kaihara-border text-kaihara-muted opacity-50 cursor-not-allowed'
-          }`} title={listening ? 'Stop' : sttAvailable ? 'Voice' : 'N/A'} disabled={!sttAvailable && !listening}>
-            {listening ? 'STOP' : 'MIC'}
+          <button type="button" onClick={listening ? stopListening : startListening}
+            disabled={!sttAvailable}
+            className={`flex-shrink-0 p-2.5 rounded-lg transition-colors ${
+              listening ? 'bg-kaihara-danger text-white animate-pulse' : sttAvailable ? 'bg-kaihara-border text-kaihara-muted hover:text-kaihara-accent' : 'bg-kaihara-border text-kaihara-muted opacity-50 cursor-not-allowed'
+            }`} title={listening ? 'Stop listening' : sttAvailable ? 'Speak (browser mic)' : 'Browser does not support speech recognition'}>
+            🎙️
           </button>
           <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
-            placeholder={listening ? 'Listening...' : 'Type message...'}
+            placeholder={listening ? (interim || 'Listening...') : 'Type message...'}
             className="flex-1 bg-kaihara-surface border border-kaihara-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-kaihara-accent min-w-0"
             autoFocus />
           <button type="submit" disabled={!input.trim() || thinking} className="flex-shrink-0 btn-primary disabled:opacity-50">
@@ -145,7 +247,7 @@ export default function Conversation({
             {Array.from({ length: 30 }).map((_, i) => (
               <span key={i} className="waveform-bar" style={{ animationDelay: `${i * 40}ms` }} />
             ))}
-            <span className="ml-3 text-xs text-kaihara-danger animate-pulse">REC</span>
+            <span className="ml-3 text-xs text-kaihara-danger animate-pulse">REC{interim ? '' : '...'}</span>
           </div>
         )}
       </div>
