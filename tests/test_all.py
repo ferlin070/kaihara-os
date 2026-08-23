@@ -709,6 +709,161 @@ test("Agent map invalid station", test_agent_map_invalid_station)
 
 
 # ============================================================
+# 16. DAEMON MANAGER
+# ============================================================
+
+section("DAEMON MANAGER")
+
+def test_daemon_manager():
+    from core.os.daemon_manager import DaemonManager
+    from core.os.kernel import KernelManager
+    kernel = KernelManager({})
+    dm = DaemonManager(kernel)
+    status = dm.status()
+    assert "watchdog_running" in status
+    assert "agents" in status
+    assert "process" in status
+    print(f"    Agents: {status['agents']['total']} total")
+    print(f"    Watchdog: {status['watchdog_running']}")
+    return True
+
+test("Daemon manager init", test_daemon_manager)
+
+def test_daemon_services():
+    from core.os.daemon_manager import DaemonManager
+    from core.os.kernel import KernelManager
+    kernel = KernelManager({})
+    dm = DaemonManager(kernel)
+    services = dm.get_service_registry()
+    assert isinstance(services, list)
+    assert len(services) == 7  # 7 kernel agents
+    print(f"    Services: {len(services)}")
+    return True
+
+test("Daemon services registry", test_daemon_services)
+
+def test_daemon_alerts():
+    from core.os.daemon_manager import DaemonManager
+    from core.os.kernel import KernelManager
+    kernel = KernelManager({})
+    dm = DaemonManager(kernel)
+    alerts = dm.get_alerts()
+    assert isinstance(alerts, list)
+    print(f"    Alerts: {len(alerts)}")
+    return True
+
+test("Daemon alerts", test_daemon_alerts)
+
+
+# ============================================================
+# 17. PROMPT STORAGE
+# ============================================================
+
+section("PROMPT STORAGE")
+
+def test_prompt_storage():
+    from core.skills.registry import SkillRegistry
+    reg = SkillRegistry()
+
+    # Save a prompt
+    result = reg.save_prompt("Test Prompt", "Hello {{name}}", "general", ["test"], "A test prompt")
+    assert result["prompt_id"].startswith("prompt_")
+    prompt_id = result["prompt_id"]
+
+    # List prompts
+    prompts = reg.list_prompts()
+    assert len(prompts) >= 1
+
+    # Search prompts
+    found = reg.list_prompts(query="Test")
+    assert len(found) >= 1
+
+    # Use prompt
+    use_result = reg.use_prompt(prompt_id)
+    assert use_result["uses"] == 1
+
+    # Delete prompt
+    deleted = reg.delete_prompt(prompt_id)
+    assert deleted is True
+
+    # Verify deleted
+    remaining = reg.list_prompts()
+    assert all(p["id"] != prompt_id for p in remaining)
+
+    print(f"    Prompt CRUD: save, list, search, use, delete")
+    return True
+
+test("Prompt storage CRUD", test_prompt_storage)
+
+
+# ============================================================
+# 18. NOTIFICATION SERVICE
+# ============================================================
+
+section("NOTIFICATION SERVICE")
+
+def test_notification_service():
+    from core.channels.notification_service import NotificationService
+    from core.channels.manager import ChannelManager
+    config = {"channel": {}}
+    mgr = ChannelManager(config)
+    svc = NotificationService(mgr)
+    status = svc.status()
+    assert "quiet_hours" in status
+    assert "rate_limit" in status
+    assert "routing" in status
+    print(f"    Quiet hours: {status['quiet_hours']}")
+    print(f"    Rate limit: {status['rate_limit']['remaining']} remaining")
+    return True
+
+test("Notification service init", test_notification_service)
+
+def test_notification_routing():
+    from core.channels.notification_service import NotificationService
+    from core.channels.manager import ChannelManager
+    config = {"channel": {}}
+    mgr = ChannelManager(config)
+    svc = NotificationService(mgr)
+    result = svc.update_routing({"urgent": ["email"], "normal": []})
+    assert result["status"] == "updated"
+    print(f"    Routing updated: {result['routing']}")
+    return True
+
+test("Notification routing update", test_notification_routing)
+
+
+# ============================================================
+# 19. WEB TOOLS (Marketing)
+# ============================================================
+
+section("WEB TOOLS (Marketing)")
+
+def test_seo_audit():
+    from core.tools.web_tools import seo_audit
+    result = json.loads(seo_audit("example.com"))
+    assert "score" in result
+    assert "issues" in result
+    assert "checks" in result
+    print(f"    SEO score: {result['score']}/100")
+    print(f"    Issues: {len(result['issues'])}, Checks: {len(result['checks'])}")
+    return True
+
+test("SEO audit tool", test_seo_audit)
+
+def test_competitor_analysis():
+    from core.tools.web_tools import analyze_competitor
+    result = json.loads(analyze_competitor("example.com"))
+    assert "tech_stack" in result
+    assert "social_links" in result
+    assert "headings" in result
+    print(f"    Tech stack: {result['tech_stack']}")
+    print(f"    Social links: {len(result['social_links'])}")
+    return True
+
+test("Competitor analysis tool", test_competitor_analysis)
+
+
+# ============================================================
 # SUMMARY
 # ============================================================
 
