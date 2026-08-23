@@ -42,12 +42,13 @@ class FleetManager:
         cls.AGENT_REGISTRY[agent_type] = agent_class
 
     def __init__(self, config: dict, memory, model_router, token_juice,
-                 approval_gate=None, agent_map=None):
+                 approval_gate=None, agent_map=None, skill_registry=None):
         self.config = config
         self.memory = memory
         self.model = model_router
         self.token_juice = token_juice
         self.approval_gate = approval_gate
+        self.skill_registry = skill_registry
         self.agent_map = agent_map
         self.active_agents: dict[str, BaseAgent] = {}
 
@@ -77,6 +78,9 @@ class FleetManager:
             token_juice=self.token_juice,
             approval_gate=self.approval_gate,
         )
+        # Pass skill registry to agent if it supports it
+        if hasattr(agent, 'set_skill_registry') and self.skill_registry:
+            agent.set_skill_registry(self.skill_registry)
         self.active_agents[agent_type] = agent
         return agent
 
@@ -143,7 +147,7 @@ class CommandCenter:
     """The brain of Kaihara — routes input, delegates to agents."""
 
     def __init__(self, config: dict, memory=None, model_router=None,
-                 token_juice=None, approval_gate=None):
+                 token_juice=None, approval_gate=None, skill_registry=None):
         self.config = config
         self.memory = memory
         self.model = model_router or ModelRouter(config)
@@ -151,11 +155,13 @@ class CommandCenter:
         self.intent_parser = IntentParser(model_router=self.model)
         self.split_brain = SplitBrain()
         self.fleet = FleetManager(
-            config, memory, self.model, token_juice, approval_gate
+            config, memory, self.model, token_juice, approval_gate,
+            skill_registry=skill_registry
         )
         self.kaihara_agent = None
         self._meta_agent = None
         self._agent_map = None
+        self._skill_registry = skill_registry
 
     async def handle_input(self, source: str, message: str,
                             conv_id: str = "default") -> dict:

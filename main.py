@@ -100,6 +100,8 @@ def init_kaihara() -> CommandCenter:
         model_router=model_router,
         registry=cc._skill_registry,
     )
+    # Connect skill registry to fleet manager for agent skill loading
+    cc.fleet.skill_registry = cc._skill_registry
 
     # Voice Pipeline
     from core.voice.pipeline import VoicePipeline

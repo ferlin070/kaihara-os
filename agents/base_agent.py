@@ -111,6 +111,87 @@ class GenericAgent(BaseAgent):
                          model_router=model_router,
                          token_juice=token_juice,
                          approval_gate=approval_gate)
+        self._skill_registry = None
+
+    def set_skill_registry(self, registry):
+        """Set the skill registry for skill loading."""
+        self._skill_registry = registry
+
+    def _find_relevant_skills(self, task: str) -> list[str]:
+        """Find skills relevant to the task based on keywords."""
+        task_lower = task.lower()
+        relevant = []
+
+        # Keyword-to-skill mapping
+        skill_keywords = {
+            "pentest": ["staged-pentest", "recon-automation", "security-killchain"],
+            "scan": ["staged-pentest", "recon-automation"],
+            "security": ["security-killchain", "staged-pentest", "poc-validation"],
+            "deploy": ["approval-gate"],
+            "animation": ["animation-first", "gsap-skills", "animated-components"],
+            "design": ["design-dna", "impeccable-design-rules", "anti-slop-design"],
+            "ui": ["tailwind-shadcn-motion", "zero-dep-components"],
+            "test": ["tdd-engineering"],
+            "report": ["token-compression-output"],
+            "memory": ["layered-memory"],
+            "workflow": ["sprint-workflow", "task-kanban-workspace"],
+            "code": ["dead-code-elimination", "code-templates-frontend"],
+            "3d": ["threejs-skills"],
+            "motion": ["gsap-skills", "motion-design"],
+            "form": ["visual-form-builder"],
+            "markdown": ["token-compression-output"],
+        }
+
+        for keyword, skill_ids in skill_keywords.items():
+            if keyword in task_lower:
+                relevant.extend(skill_ids)
+
+        # Also check skill registry if available
+        if self._skill_registry:
+            try:
+                all_skills = self._skill_registry.list_skills()
+                for skill in all_skills:
+                    tags = skill.get("tags", [])
+                    name = skill.get("name", "").lower()
+                    desc = skill.get("description", "").lower()
+                    skill_id = skill.get("id", "")
+
+                    # Check if any tag matches task keywords
+                    task_words = set(task_lower.split())
+                    tag_words = set(t.lower() for t in tags)
+
+                    if task_words & tag_words and skill_id not in relevant:
+                        relevant.append(skill_id)
+                    elif any(t in task_lower for t in tags) and skill_id not in relevant:
+                        relevant.append(skill_id)
+            except Exception:
+                pass
+
+        return list(set(relevant))[:3]  # Max 3 skills
+
+    def _load_skills_content(self, skill_ids: list[str]) -> str:
+        """Load content from multiple skills."""
+        contents = []
+        for skill_id in skill_ids:
+            content = self.load_skill(skill_id)
+            if content:
+                # Extract key sections only (not full file)
+                lines = content.split("\n")
+                key_sections = []
+                in_section = False
+                for line in lines:
+                    if line.startswith("## ") or line.startswith("---"):
+                        in_section = True
+                        key_sections.append(line)
+                    elif in_section and line.strip():
+                        key_sections.append(line)
+                    elif line.startswith("## "):
+                        in_section = False
+
+                if key_sections:
+                    contents.append(f"[SKILL: {skill_id}]\n" + "\n".join(key_sections[:30]))
+
+        return "\n\n".join(contents)
 
     @staticmethod
     def _gather_web_context(task: str) -> str:
@@ -141,12 +222,18 @@ class GenericAgent(BaseAgent):
         return "\n\n".join(parts)
 
     async def run(self, task: str, context: dict | None = None) -> dict:
-        """Execute task using SOUL.md personality + live web tools."""
+        """Execute task using SOUL.md personality + skills + live web tools."""
         try:
             # Build context from memory if available
             memory_context = ""
             if self.memory:
                 memory_context = self.memory.super_context(task)
+
+            # Load relevant skills
+            skill_context = ""
+            relevant_skills = self._find_relevant_skills(task)
+            if relevant_skills:
+                skill_context = self._load_skills_content(relevant_skills)
 
             # Live web injection for research/marketing tasks
             web_context = ""
@@ -154,7 +241,7 @@ class GenericAgent(BaseAgent):
                 web_context = self._gather_web_context(task)
 
             full_context = "\n\n".join(
-                x for x in (memory_context, web_context) if x)
+                x for x in (skill_context, memory_context, web_context) if x)
 
             # Use think() which applies SOUL.md as system prompt
             response = await self.think(task, context=full_context)
@@ -170,6 +257,7 @@ class GenericAgent(BaseAgent):
             return {
                 "agent": self.AGENT_TYPE,
                 "text": response,
+                "skills_used": relevant_skills,
                 "web_used": bool(web_context),
                 "status": "ok"
             }
