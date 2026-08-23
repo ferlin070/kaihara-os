@@ -7,12 +7,19 @@ import {
   getAuditLog,
   runPentest,
   getPentestSessions,
+  getSecurityAgentStatus,
+  runSecurityAgent,
+  securityDnsLookup,
+  securityPortScan,
+  securityVulnScan,
+  securityFullRecon,
   type SecurityStatus,
   type Approval,
   type AuditEntry,
+  type SecurityAgentStatus,
 } from '../lib/api'
 
-type Tab = 'overview' | 'approvals' | 'audit' | 'pentest'
+type Tab = 'overview' | 'agent' | 'approvals' | 'audit' | 'pentest'
 
 export default function SecurityView() {
   const [tab, setTab] = useState<Tab>('overview')
@@ -33,7 +40,7 @@ export default function SecurityView() {
   return (
     <div className="flex-1 flex flex-col">
       <div className="flex border-b border-kaihara-border">
-        {(['overview', 'approvals', 'audit', 'pentest'] as const).map(t => (
+        {(['overview', 'agent', 'approvals', 'audit', 'pentest'] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -49,6 +56,7 @@ export default function SecurityView() {
       </div>
 
       {tab === 'overview' && <Overview status={status} />}
+      {tab === 'agent' && <SecurityAgentTab />}
       {tab === 'approvals' && <Approvals />}
       {tab === 'audit' && <AuditLog />}
       {tab === 'pentest' && <Pentest />}
@@ -97,6 +105,189 @@ function Overview({ status }: { status: SecurityStatus | null }) {
     </div>
   )
 }
+
+// ============================================================
+// Security Agent Tab — Real tool capabilities
+// ============================================================
+
+function SecurityAgentTab() {
+  const [agentStatus, setAgentStatus] = useState<SecurityAgentStatus | null>(null)
+  const [target, setTarget] = useState('')
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<any>(null)
+  const [taskInput, setTaskInput] = useState('')
+
+  useEffect(() => {
+    getSecurityAgentStatus().then(setAgentStatus).catch(() => {})
+  }, [])
+
+  const runTool = async (toolFn: (t: string) => Promise<any>) => {
+    if (!target.trim() || running) return
+    setRunning(true)
+    setResult(null)
+    try {
+      const res = await toolFn(target.trim())
+      setResult(res)
+    } catch (e) {
+      setResult({ error: String(e) })
+    }
+    setRunning(false)
+  }
+
+  const handleRunTask = async () => {
+    if (!taskInput.trim() || running) return
+    setRunning(true)
+    setResult(null)
+    try {
+      const res = await runSecurityAgent(taskInput.trim())
+      setResult(res)
+    } catch (e) {
+      setResult({ error: String(e) })
+    }
+    setRunning(false)
+  }
+
+  return (
+    <div className="flex-1 p-4 overflow-y-auto space-y-4">
+      {/* Agent Status */}
+      <div className="hud-panel">
+        <h3 className="text-sm font-bold mb-2">Security Agent Status</h3>
+        {agentStatus ? (
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex justify-between">
+              <span className="text-kaihara-muted">Tools</span>
+              <span>{agentStatus.tools?.length || 0} registered</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-kaihara-muted">Sandbox</span>
+              <span className={agentStatus.sandbox_available ? 'text-kaihara-success' : 'text-kaihara-danger'}>
+                {agentStatus.sandbox_available ? 'Available' : 'Unavailable'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-kaihara-muted">Audit</span>
+              <span className={agentStatus.audit_enabled ? 'text-kaihara-success' : 'text-kaihara-danger'}>
+                {agentStatus.audit_enabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-kaihara-muted">Approval Gate</span>
+              <span className={agentStatus.approval_gate_enabled ? 'text-kaihara-success' : 'text-kaihara-danger'}>
+                {agentStatus.approval_gate_enabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-kaihara-muted">Loading...</p>
+        )}
+      </div>
+
+      {/* Quick Tools */}
+      <div className="hud-panel">
+        <h3 className="text-sm font-bold mb-2">Quick Tools</h3>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            placeholder="Target (e.g., example.com)"
+            className="flex-1 bg-kaihara-bg border border-kaihara-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-kaihara-accent"
+            disabled={running}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => runTool(securityDnsLookup)}
+            disabled={!target.trim() || running}
+            className="px-3 py-1.5 text-xs bg-kaihara-border rounded hover:bg-kaihara-accent/20 disabled:opacity-50"
+          >
+            🔍 DNS Lookup
+          </button>
+          <button
+            onClick={() => runTool(securityPortScan)}
+            disabled={!target.trim() || running}
+            className="px-3 py-1.5 text-xs bg-kaihara-border rounded hover:bg-kaihara-accent/20 disabled:opacity-50"
+          >
+            🔌 Port Scan
+          </button>
+          <button
+            onClick={() => runTool(securityVulnScan)}
+            disabled={!target.trim() || running}
+            className="px-3 py-1.5 text-xs bg-kaihara-border rounded hover:bg-kaihara-accent/20 disabled:opacity-50"
+          >
+            🛡️ Vuln Scan
+          </button>
+          <button
+            onClick={() => runTool(securityFullRecon)}
+            disabled={!target.trim() || running}
+            className="px-3 py-1.5 text-xs bg-kaihara-border rounded hover:bg-kaihara-accent/20 disabled:opacity-50"
+          >
+            🎯 Full Recon
+          </button>
+        </div>
+      </div>
+
+      {/* Natural Language Task */}
+      <div className="hud-panel">
+        <h3 className="text-sm font-bold mb-2">Natural Language Task</h3>
+        <div className="flex gap-2 mb-2">
+          <input
+            type="text"
+            value={taskInput}
+            onChange={(e) => setTaskInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleRunTask()}
+            placeholder="e.g., 'scan port 80 on example.com' or 'test XSS on target'"
+            className="flex-1 bg-kaihara-bg border border-kaihara-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-kaihara-accent"
+            disabled={running}
+          />
+          <button
+            onClick={handleRunTask}
+            disabled={!taskInput.trim() || running}
+            className="px-4 py-1.5 text-xs bg-kaihara-accent text-white rounded hover:bg-kaihara-accent/80 disabled:opacity-50"
+          >
+            {running ? 'Running...' : 'Run'}
+          </button>
+        </div>
+        <p className="text-xs text-kaihara-muted">
+          Examples: "dns lookup google.com", "port scan 192.168.1.1", "full recon example.com"
+        </p>
+      </div>
+
+      {/* Results */}
+      {result && (
+        <div className="hud-panel">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold">Result</h3>
+            <span className={`text-xs px-2 py-0.5 rounded ${result.status === 'ok' ? 'bg-kaihara-success/20 text-kaihara-success' : result.status === 'pending_approval' ? 'bg-kaihara-warning/20 text-kaihara-warning' : 'bg-kaihara-danger/20 text-kaihara-danger'}`}>
+              {result.status || 'unknown'}
+            </span>
+          </div>
+          <pre className="text-xs text-kaihara-muted overflow-x-auto max-h-64 overflow-y-auto bg-kaihara-bg p-2 rounded">
+            {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
+          </pre>
+        </div>
+      )}
+
+      {/* Available Tools List */}
+      {agentStatus?.tools && (
+        <div className="hud-panel">
+          <h3 className="text-sm font-bold mb-2">Available Tools</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {agentStatus.tools.map(tool => (
+              <span key={tool} className="text-xs px-2 py-0.5 bg-kaihara-border rounded">
+                {tool}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// Approvals Tab
+// ============================================================
 
 function Approvals() {
   const [pending, setPending] = useState<Approval[]>([])
@@ -163,6 +354,10 @@ function Approvals() {
   )
 }
 
+// ============================================================
+// Audit Log Tab
+// ============================================================
+
 function AuditLog() {
   const [entries, setEntries] = useState<AuditEntry[]>([])
 
@@ -208,6 +403,10 @@ function AuditLog() {
     </div>
   )
 }
+
+// ============================================================
+// Pentest Tab
+// ============================================================
 
 function Pentest() {
   const [target, setTarget] = useState('')

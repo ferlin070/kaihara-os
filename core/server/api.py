@@ -627,6 +627,81 @@ def create_app(command_center) -> FastAPI:
         return await pentest.scanner.scan_custom(target)
 
     # ============================================================
+    # Security Agent endpoints (real tool capabilities)
+    # ============================================================
+
+    @app.get("/api/security/agent/status")
+    async def security_agent_status():
+        """Get security agent status with tool info."""
+        agent = getattr(command_center, "_security_agent", None)
+        if not agent:
+            return {"error": "Security agent not initialized"}
+        return agent.status()
+
+    @app.post("/api/security/agent/run")
+    async def security_agent_run(payload: dict):
+        """Run a task through the security agent with real tools."""
+        agent = getattr(command_center, "_security_agent", None)
+        if not agent:
+            return {"error": "Security agent not initialized"}
+        task = payload.get("task", "")
+        if not task:
+            return {"error": "No task specified"}
+        context = payload.get("context", {})
+        result = await agent.run(task, context=context)
+        return result
+
+    @app.post("/api/security/agent/dns")
+    async def security_agent_dns(payload: dict):
+        """DNS lookup via security agent."""
+        agent = getattr(command_center, "_security_agent", None)
+        if not agent:
+            return {"error": "Security agent not initialized"}
+        target = payload.get("target", "")
+        if not target:
+            return {"error": "No target specified"}
+        result = await agent.use_tool("dns_lookup", target=target)
+        return result
+
+    @app.post("/api/security/agent/portscan")
+    async def security_agent_portscan(payload: dict):
+        """Port scan via security agent."""
+        agent = getattr(command_center, "_security_agent", None)
+        if not agent:
+            return {"error": "Security agent not initialized"}
+        target = payload.get("target", "")
+        if not target:
+            return {"error": "No target specified"}
+        ports = payload.get("ports", "1-1000")
+        scan_type = payload.get("scan_type", "fast")
+        result = await agent.use_tool("port_scan", target=target, ports=ports, scan_type=scan_type)
+        return result
+
+    @app.post("/api/security/agent/vulnscan")
+    async def security_agent_vulnscan(payload: dict):
+        """Vulnerability scan via security agent."""
+        agent = getattr(command_center, "_security_agent", None)
+        if not agent:
+            return {"error": "Security agent not initialized"}
+        target = payload.get("target", "")
+        if not target:
+            return {"error": "No target specified"}
+        result = await agent.use_tool("vuln_scan", target=target)
+        return result
+
+    @app.post("/api/security/agent/fullrecon")
+    async def security_agent_fullrecon(payload: dict):
+        """Full recon via security agent."""
+        agent = getattr(command_center, "_security_agent", None)
+        if not agent:
+            return {"error": "Security agent not initialized"}
+        target = payload.get("target", "")
+        if not target:
+            return {"error": "No target specified"}
+        result = await agent.use_tool("full_recon", target=target)
+        return result
+
+    # ============================================================
     # Channels endpoints
     # ============================================================
 

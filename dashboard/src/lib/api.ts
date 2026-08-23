@@ -425,6 +425,71 @@ export async function getPentestSessions(): Promise<{ sessions: any[] }> {
 }
 
 // ============================================================
+// Security Agent (real tool capabilities)
+// ============================================================
+
+export interface SecurityAgentStatus {
+  agent_type: string
+  tools: string[]
+  sandbox_available: boolean
+  audit_enabled: boolean
+  approval_gate_enabled: boolean
+  pentest_available: boolean
+  soul_loaded: boolean
+  skills: string[]
+}
+
+export async function getSecurityAgentStatus(): Promise<SecurityAgentStatus> {
+  const res = await fetch(`${API_BASE}/security/agent/status`)
+  return res.json()
+}
+
+export async function runSecurityAgent(task: string, context?: any): Promise<any> {
+  const res = await fetch(`${API_BASE}/security/agent/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task, context }),
+  })
+  return res.json()
+}
+
+export async function securityDnsLookup(target: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/security/agent/dns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target }),
+  })
+  return res.json()
+}
+
+export async function securityPortScan(target: string, ports?: string, scan_type?: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/security/agent/portscan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target, ports, scan_type }),
+  })
+  return res.json()
+}
+
+export async function securityVulnScan(target: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/security/agent/vulnscan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target }),
+  })
+  return res.json()
+}
+
+export async function securityFullRecon(target: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/security/agent/fullrecon`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target }),
+  })
+  return res.json()
+}
+
+// ============================================================
 // Channels
 // ============================================================
 

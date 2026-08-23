@@ -160,7 +160,21 @@ def init_kaihara() -> CommandCenter:
     FleetManager.register("kaihara", create_agent_class("kaihara", "kaihara.md"))
     FleetManager.register("coding", create_agent_class("coding", "coding.md"))
     FleetManager.register("marketing", create_agent_class("marketing", "marketing.md"))
-    FleetManager.register("security", create_agent_class("security", "security.md"))
+
+    # Security Agent — real tool capabilities, not generic
+    from agents.security_agent import SecurityAgent
+    cc._security_agent = SecurityAgent(
+        config={**config, "soul_dir": str(ROOT / "config" / "soul")},
+        memory=memory,
+        model_router=model_router,
+        token_juice=token_juice,
+        approval_gate=cc._approval_gate,
+        sandbox=cc._sandbox,
+        audit=cc._audit,
+        pentest=cc._pentest,
+    )
+    FleetManager.register("security", SecurityAgent)
+
     FleetManager.register("deploy", create_agent_class("deploy", "deploy.md"))
     FleetManager.register("research", create_agent_class("research", "research.md"))
 
