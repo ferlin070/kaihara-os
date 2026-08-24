@@ -4,9 +4,14 @@ import {
   generateYoutubeThumb, generateQuoteImage,
   searchStockImage, searchStockVideo, videoTrim, videoConcat,
   videoFromImages, videoAddText, videoExport, mediaProbe,
+  gdriveMediaSearch, gdriveMediaBrowse, gdriveMediaDownload,
+  gdriveMediaStorage,
+  pinterestSearch, pinterestSearchImages, pinterestSearchVideos,
+  pinterestDownloadPin, pinterestDownloadBoard, pinterestListDownloads,
+  pinterestClearDownloads,
 } from '../lib/api'
 
-type Tab = 'poster' | 'banner' | 'social' | 'stock' | 'video' | 'probe'
+type Tab = 'poster' | 'banner' | 'social' | 'stock' | 'video' | 'probe' | 'gdrive' | 'pinterest'
 
 export default function EditorView() {
   const [tab, setTab] = useState<Tab>('poster')
@@ -42,6 +47,19 @@ export default function EditorView() {
   // Probe
   const [probePath, setProbePath] = useState('')
   const [probeResult, setProbeResult] = useState<any>(null)
+
+  // GDrive
+  const [gdriveQuery, setGdriveQuery] = useState('')
+  const [gdrivePath, setGdrivePath] = useState('')
+  const [gdriveResults, setGdriveResults] = useState<any[]>([])
+  const [gdriveFolders, setGdriveFolders] = useState<any[]>([])
+  const [gdriveStorage, setGdriveStorage] = useState<any>(null)
+
+  // Pinterest
+  const [pinQuery, setPinQuery] = useState('')
+  const [pinType, setPinType] = useState<'all' | 'images' | 'videos'>('all')
+  const [pinResults, setPinResults] = useState<any[]>([])
+  const [pinDownloads, setPinDownloads] = useState<any[]>([])
 
   const handleGenerate = useCallback(async (fn: () => Promise<any>) => {
     setLoading(true)
@@ -92,6 +110,85 @@ export default function EditorView() {
     setLoading(false)
   }, [probePath])
 
+  const handleGdriveSearch = useCallback(async () => {
+    if (!gdriveQuery) return
+    setLoading(true)
+    setError('')
+    setGdriveResults([])
+    try {
+      const r = await gdriveMediaSearch(gdriveQuery)
+      if (r.ok) {
+        setGdriveResults(r.results || [])
+      } else {
+        setError(r.error || 'Search failed')
+      }
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [gdriveQuery])
+
+  const handleGdriveBrowse = useCallback(async (path?: string) => {
+    setLoading(true)
+    setError('')
+    setGdriveResults([])
+    setGdriveFolders([])
+    try {
+      const r = await gdriveMediaBrowse(path || gdrivePath)
+      if (r.ok) {
+        setGdriveFolders(r.folders || [])
+        setGdriveResults(r.files || [])
+      } else {
+        setError(r.error || 'Browse failed')
+      }
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [gdrivePath])
+
+  const handleGdriveStorage = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await gdriveMediaStorage()
+      setGdriveStorage(r)
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [])
+
+  const handlePinterestSearch = useCallback(async () => {
+    if (!pinQuery) return
+    setLoading(true)
+    setError('')
+    setPinResults([])
+    try {
+      const fn = pinType === 'images' ? pinterestSearchImages :
+                 pinType === 'videos' ? pinterestSearchVideos : pinterestSearch
+      const r = await fn(pinQuery)
+      if (r.ok) {
+        setPinResults(r.files || [])
+      } else {
+        setError(r.error || 'Search failed')
+      }
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [pinQuery, pinType])
+
+  const handlePinterestLoadDownloads = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await pinterestListDownloads()
+      if (r.ok) setPinDownloads(r.files || [])
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [])
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'poster', label: 'Poster' },
     { id: 'banner', label: 'Banner' },
@@ -99,6 +196,8 @@ export default function EditorView() {
     { id: 'stock', label: 'Stock' },
     { id: 'video', label: 'Video' },
     { id: 'probe', label: 'Probe' },
+    { id: 'gdrive', label: 'GDrive' },
+    { id: 'pinterest', label: 'Pinterest' },
   ]
 
   return (
@@ -325,6 +424,120 @@ export default function EditorView() {
             <pre className="text-[10px] text-kaihara-text bg-black/30 rounded p-2 max-h-48 overflow-auto font-mono">
               {JSON.stringify(probeResult, null, 2)}
             </pre>
+          )}
+        </div>
+      )}
+
+      {/* GDrive Tab */}
+      {tab === 'gdrive' && (
+        <div className="hud-panel">
+          <h4 className="text-[10px] text-kaihara-muted mb-3">GOOGLE DRIVE MEDIA</h4>
+          <div className="flex gap-2 mb-3">
+            <input value={gdriveQuery} onChange={e => setGdriveQuery(e.target.value)}
+              className="kaihara-input flex-1 text-xs" placeholder="Search files in GDrive..."
+              onKeyDown={e => e.key === 'Enter' && handleGdriveSearch()} />
+            <button onClick={handleGdriveSearch} disabled={loading}
+              className="kaihara-btn text-xs px-3">
+              {loading ? '...' : 'Search'}
+            </button>
+          </div>
+          <div className="flex gap-2 mb-3">
+            <input value={gdrivePath} onChange={e => setGdrivePath(e.target.value)}
+              className="kaihara-input flex-1 text-xs" placeholder="Folder path..." />
+            <button onClick={() => handleGdriveBrowse()} disabled={loading}
+              className="kaihara-btn text-xs px-3">
+              Browse
+            </button>
+            <button onClick={handleGdriveStorage} disabled={loading}
+              className="kaihara-btn text-xs px-3">
+              Storage
+            </button>
+          </div>
+          {gdriveStorage && gdriveStorage.ok && (
+            <div className="text-[10px] text-kaihara-muted mb-2">
+              Used: {(gdriveStorage.used / 1073741824).toFixed(1)}GB /
+              {(gdriveStorage.total / 1073741824).toFixed(1)}GB
+            </div>
+          )}
+          {gdriveFolders.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[10px] text-kaihara-muted mb-1">Folders:</div>
+              <div className="flex flex-wrap gap-1">
+                {gdriveFolders.map((f, i) => (
+                  <button key={i} onClick={() => handleGdriveBrowse(f.name)}
+                    className="text-[10px] px-2 py-1 bg-kaihara-border rounded text-kaihara-accent hover:bg-kaihara-accent/20">
+                    📁 {f.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {gdriveResults.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 max-h-64 overflow-auto">
+              {gdriveResults.map((f: any, i: number) => (
+                <div key={i} className="text-[10px] p-2 bg-black/20 rounded">
+                  <div className="text-kaihara-text truncate">{f.name}</div>
+                  <div className="text-kaihara-muted">
+                    {(f.size / 1024).toFixed(0)}KB · {f.type}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pinterest Tab */}
+      {tab === 'pinterest' && (
+        <div className="hud-panel">
+          <h4 className="text-[10px] text-kaihara-muted mb-3">PINTEREST MEDIA</h4>
+          <div className="flex gap-2 mb-3">
+            <input value={pinQuery} onChange={e => setPinQuery(e.target.value)}
+              className="kaihara-input flex-1 text-xs" placeholder="Search Pinterest..."
+              onKeyDown={e => e.key === 'Enter' && handlePinterestSearch()} />
+            <select value={pinType} onChange={e => setPinType(e.target.value as any)}
+              className="kaihara-input text-xs w-24">
+              <option value="all">All</option>
+              <option value="images">Images</option>
+              <option value="videos">Videos</option>
+            </select>
+            <button onClick={handlePinterestSearch} disabled={loading}
+              className="kaihara-btn text-xs px-3">
+              {loading ? '...' : 'Search'}
+            </button>
+          </div>
+          <div className="flex gap-2 mb-3">
+            <button onClick={handlePinterestLoadDownloads} disabled={loading}
+              className="kaihara-btn text-xs px-3">
+              My Downloads
+            </button>
+            <button onClick={() => pinterestClearDownloads().then(() => setPinDownloads([]))}
+              disabled={loading}
+              className="kaihara-btn text-xs px-3 text-kaihara-danger">
+              Clear
+            </button>
+          </div>
+          {pinResults.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 max-h-64 overflow-auto">
+              {pinResults.map((item: any, i: number) => (
+                <div key={i} className="text-[10px] p-2 bg-black/20 rounded">
+                  <div className="text-kaihara-text truncate">{item.title || 'Untitled'}</div>
+                  <div className="text-kaihara-muted">{item.type}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {pinDownloads.length > 0 && (
+            <div className="mt-2">
+              <div className="text-[10px] text-kaihara-muted mb-1">Downloads ({pinDownloads.length}):</div>
+              <div className="grid grid-cols-3 gap-1 max-h-32 overflow-auto">
+                {pinDownloads.map((f: any, i: number) => (
+                  <div key={i} className="text-[10px] p-1 bg-black/20 rounded truncate text-kaihara-text">
+                    {f.name}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

@@ -1225,6 +1225,88 @@ export async function mediaProbe(path: string): Promise<any> {
 }
 
 // ============================================================
+// GDrive Media
+// ============================================================
+
+export async function gdriveMediaSearch(query: string, folder = '', mediaType = 'all', limit = 20): Promise<any> {
+  const params = new URLSearchParams({ query, media_type: mediaType, limit: String(limit) })
+  if (folder) params.set('folder', folder)
+  const res = await fetch(`${API_BASE}/gdrive-media/search?${params}`)
+  return res.json()
+}
+
+export async function gdriveMediaBrowse(path = ''): Promise<any> {
+  const res = await fetch(`${API_BASE}/gdrive-media/browse?path=${encodeURIComponent(path)}`)
+  return res.json()
+}
+
+export async function gdriveMediaDownload(remotePath: string, localDir = ''): Promise<any> {
+  const res = await fetch(`${API_BASE}/gdrive-media/download`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ remote_path: remotePath, local_dir: localDir }),
+  })
+  return res.json()
+}
+
+export async function gdriveMediaUpload(localPath: string, remoteFolder = ''): Promise<any> {
+  const res = await fetch(`${API_BASE}/gdrive-media/upload`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ local_path: localPath, remote_folder: remoteFolder }),
+  })
+  return res.json()
+}
+
+export async function gdriveMediaStorage(): Promise<any> {
+  const res = await fetch(`${API_BASE}/gdrive-media/storage`)
+  return res.json()
+}
+
+// ============================================================
+// Pinterest
+// ============================================================
+
+export async function pinterestSearch(query: string, limit = 20): Promise<any> {
+  const res = await fetch(`${API_BASE}/pinterest/search?query=${encodeURIComponent(query)}&limit=${limit}`)
+  return res.json()
+}
+
+export async function pinterestSearchImages(query: string, limit = 20): Promise<any> {
+  const res = await fetch(`${API_BASE}/pinterest/search-images?query=${encodeURIComponent(query)}&limit=${limit}`)
+  return res.json()
+}
+
+export async function pinterestSearchVideos(query: string, limit = 10): Promise<any> {
+  const res = await fetch(`${API_BASE}/pinterest/search-videos?query=${encodeURIComponent(query)}&limit=${limit}`)
+  return res.json()
+}
+
+export async function pinterestDownloadPin(url: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/pinterest/download-pin`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  })
+  return res.json()
+}
+
+export async function pinterestDownloadBoard(boardUrl: string, limit = 50): Promise<any> {
+  const res = await fetch(`${API_BASE}/pinterest/download-board`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ board_url: boardUrl, limit }),
+  })
+  return res.json()
+}
+
+export async function pinterestListDownloads(): Promise<any> {
+  const res = await fetch(`${API_BASE}/pinterest/downloads`)
+  return res.json()
+}
+
+export async function pinterestClearDownloads(): Promise<any> {
+  const res = await fetch(`${API_BASE}/pinterest/clear`, { method: 'POST' })
+  return res.json()
+}
+
+// ============================================================
 // Meta Agent
 // ============================================================
 

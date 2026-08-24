@@ -1083,10 +1083,12 @@ async def test_editor_agent():
     agent = EditorAgent(config={"media_dir": "/tmp/media"})
     st = agent.status()
     tools = st.get("tools", [])
-    assert len(tools) >= 20, f"Too few tools: {len(tools)}"
+    assert len(tools) >= 29, f"Too few tools: {len(tools)}"
     print(f"    Editor agent tools: {len(tools)}")
     expected = ["video_trim", "video_concat", "generate_poster",
-                "search_stock_image", "image_resize"]
+                "search_stock_image", "image_resize",
+                "gdrive_search_media", "gdrive_browse_folder",
+                "pinterest_search", "pinterest_download_pin"]
     for t in expected:
         assert t in tools, f"Missing tool: {t}"
     print(f"    All expected tools present")
@@ -1103,6 +1105,57 @@ async def test_editor_video_probe():
     return True
 
 test("Editor: video probe", test_editor_video_probe)
+
+section("16. GDRIVE MEDIA TOOLS")
+
+def test_gdrive_tools_init():
+    from core.tools.gdrive_tools import GDriveMediaTools, GDRIVE_TOOLS
+    tools = GDriveMediaTools(remote_name="gdrive")
+    assert len(GDRIVE_TOOLS) == 5, f"Expected 5 tools, got {len(GDRIVE_TOOLS)}"
+    tool_names = [t["name"] for t in GDRIVE_TOOLS]
+    assert "gdrive_search_media" in tool_names
+    assert "gdrive_browse_folder" in tool_names
+    assert "gdrive_download_media" in tool_names
+    print(f"    GDrive tools: {len(GDRIVE_TOOLS)} — {tool_names}")
+    return True
+
+test("GDrive tools init", test_gdrive_tools_init)
+
+def test_gdrive_search_no_rclone():
+    from core.tools.gdrive_tools import GDriveMediaTools
+    tools = GDriveMediaTools(remote_name="nonexistent")
+    r = tools.search_media("test")
+    assert r.get("ok") is False or "error" in r or "results" in r
+    print(f"    GDrive search (no rclone): handled")
+    return True
+
+test("GDrive search graceful", test_gdrive_search_no_rclone)
+
+section("17. PINTEREST TOOLS")
+
+def test_pinterest_tools_init():
+    from core.tools.pinterest_tools import PinterestTools, PINTEREST_TOOLS
+    tools = PinterestTools()
+    assert len(PINTEREST_TOOLS) == 7, f"Expected 7 tools, got {len(PINTEREST_TOOLS)}"
+    tool_names = [t["name"] for t in PINTEREST_TOOLS]
+    assert "pinterest_search" in tool_names
+    assert "pinterest_download_pin" in tool_names
+    assert "pinterest_download_board" in tool_names
+    print(f"    Pinterest tools: {len(PINTEREST_TOOLS)} — {tool_names}")
+    return True
+
+test("Pinterest tools init", test_pinterest_tools_init)
+
+def test_pinterest_list_downloads():
+    from core.tools.pinterest_tools import PinterestTools
+    tools = PinterestTools()
+    r = tools.list_downloads()
+    assert r["ok"]
+    assert "files" in r
+    print(f"    Pinterest list downloads: {r['total']} files")
+    return True
+
+test("Pinterest list downloads", test_pinterest_list_downloads)
 
 section("SUMMARY")
 print(f"  PASS: {PASS}")

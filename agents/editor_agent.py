@@ -22,6 +22,8 @@ from core.tools.image_tools import (
     generate_youtube_thumbnail, generate_quote_image,
     generate_gradient, add_watermark, batch_generate_posters,
 )
+from core.tools.gdrive_tools import GDriveMediaTools, GDRIVE_TOOLS
+from core.tools.pinterest_tools import PinterestTools, PINTEREST_TOOLS
 
 
 class EditorAgent(BaseAgent):
@@ -31,6 +33,7 @@ class EditorAgent(BaseAgent):
 
     APPROVAL_REQUIRED = {
         "batch_generate", "video_export", "download_stock_video",
+        "gdrive_download_media", "pinterest_download_board",
     }
 
     def __init__(self, config=None, memory=None, model_router=None,
@@ -41,6 +44,10 @@ class EditorAgent(BaseAgent):
         )
         self.media_dir = (config or {}).get("media_dir",
             os.path.join(os.path.dirname(__file__), "..", "..", "data", "media"))
+        self._gdrive = GDriveMediaTools(
+            remote_name=(config or {}).get("gdrive_remote", "gdrive")
+        )
+        self._pinterest = PinterestTools()
         self._register_tools()
 
     def _register_tools(self):
@@ -82,6 +89,22 @@ class EditorAgent(BaseAgent):
         self.register_tool("generate_gradient", self._generate_gradient)
         self.register_tool("add_watermark", self._add_watermark)
         self.register_tool("batch_generate_posters", self._batch_generate_posters)
+
+        # Google Drive tools
+        self.register_tool("gdrive_search_media", self._gdrive_search_media)
+        self.register_tool("gdrive_browse_folder", self._gdrive_browse_folder)
+        self.register_tool("gdrive_download_media", self._gdrive_download_media)
+        self.register_tool("gdrive_get_storage_info", self._gdrive_get_storage_info)
+        self.register_tool("gdrive_upload_media", self._gdrive_upload_media)
+
+        # Pinterest tools
+        self.register_tool("pinterest_search", self._pinterest_search)
+        self.register_tool("pinterest_search_images", self._pinterest_search_images)
+        self.register_tool("pinterest_search_videos", self._pinterest_search_videos)
+        self.register_tool("pinterest_download_pin", self._pinterest_download_pin)
+        self.register_tool("pinterest_download_board", self._pinterest_download_board)
+        self.register_tool("pinterest_list_downloads", self._pinterest_list_downloads)
+        self.register_tool("pinterest_clear_downloads", self._pinterest_clear_downloads)
 
     # ---- Video Tools ----
 
@@ -283,8 +306,55 @@ class EditorAgent(BaseAgent):
         return add_watermark(input_path, output_path, text, position)
 
     async def _batch_generate_posters(self, items: list,
-                                      output_dir: str = None) -> dict:
+                                       output_dir: str = None) -> dict:
         return batch_generate_posters(items, output_dir)
+
+    # ---- Google Drive Tools ----
+
+    async def _gdrive_search_media(self, query: str, folder: str = "",
+                                    media_type: str = "all",
+                                    limit: int = 20) -> dict:
+        return self._gdrive.search_media(query, folder, media_type, limit)
+
+    async def _gdrive_browse_folder(self, path: str = "") -> dict:
+        return self._gdrive.browse_folder(path)
+
+    async def _gdrive_download_media(self, remote_path: str,
+                                      local_dir: str = "") -> dict:
+        return self._gdrive.download_media(remote_path, local_dir)
+
+    async def _gdrive_get_storage_info(self) -> dict:
+        return self._gdrive.get_storage_info()
+
+    async def _gdrive_upload_media(self, local_path: str,
+                                    remote_folder: str = "") -> dict:
+        return self._gdrive.upload_media(local_path, remote_folder)
+
+    # ---- Pinterest Tools ----
+
+    async def _pinterest_search(self, query: str, limit: int = 20) -> dict:
+        return self._pinterest.search(query, limit)
+
+    async def _pinterest_search_images(self, query: str,
+                                        limit: int = 20) -> dict:
+        return self._pinterest.search_images(query, limit)
+
+    async def _pinterest_search_videos(self, query: str,
+                                        limit: int = 10) -> dict:
+        return self._pinterest.search_videos(query, limit)
+
+    async def _pinterest_download_pin(self, url: str) -> dict:
+        return self._pinterest.download_pin(url)
+
+    async def _pinterest_download_board(self, board_url: str,
+                                         limit: int = 50) -> dict:
+        return self._pinterest.download_board(board_url, limit)
+
+    async def _pinterest_list_downloads(self) -> dict:
+        return self._pinterest.list_downloads()
+
+    async def _pinterest_clear_downloads(self) -> dict:
+        return self._pinterest.clear_downloads()
 
     # ---- Background Task ----
 

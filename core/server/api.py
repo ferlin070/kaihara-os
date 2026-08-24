@@ -2048,4 +2048,105 @@ Format as JSON with keys: title, body, hashtags, cta"""
             return {"error": "GDrive not initialized"}
         return {"instructions": gdrive.setup_instructions()}
 
+    # ============================================================
+    # GDRIVE MEDIA — search, browse, download media files
+    # ============================================================
+
+    @app.get("/api/gdrive-media/search")
+    async def gdrive_media_search(query: str, folder: str = "",
+                                   media_type: str = "all",
+                                   limit: int = 20):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._gdrive_search_media(query, folder, media_type, limit)
+
+    @app.get("/api/gdrive-media/browse")
+    async def gdrive_media_browse(path: str = ""):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._gdrive_browse_folder(path)
+
+    @app.post("/api/gdrive-media/download")
+    async def gdrive_media_download(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        remote_path = payload.get("remote_path", "")
+        local_dir = payload.get("local_dir", "")
+        return await editor._gdrive_download_media(remote_path, local_dir)
+
+    @app.post("/api/gdrive-media/upload")
+    async def gdrive_media_upload(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        local_path = payload.get("local_path", "")
+        remote_folder = payload.get("remote_folder", "")
+        return await editor._gdrive_upload_media(local_path, remote_folder)
+
+    @app.get("/api/gdrive-media/storage")
+    async def gdrive_media_storage():
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._gdrive_get_storage_info()
+
+    # ============================================================
+    # PINTEREST — search, download pins/boards
+    # ============================================================
+
+    @app.get("/api/pinterest/search")
+    async def pinterest_search(query: str, limit: int = 20):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pinterest_search(query, limit)
+
+    @app.get("/api/pinterest/search-images")
+    async def pinterest_search_images(query: str, limit: int = 20):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pinterest_search_images(query, limit)
+
+    @app.get("/api/pinterest/search-videos")
+    async def pinterest_search_videos(query: str, limit: int = 10):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pinterest_search_videos(query, limit)
+
+    @app.post("/api/pinterest/download-pin")
+    async def pinterest_download_pin(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        url = payload.get("url", "")
+        return await editor._pinterest_download_pin(url)
+
+    @app.post("/api/pinterest/download-board")
+    async def pinterest_download_board(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        board_url = payload.get("board_url", "")
+        limit = payload.get("limit", 50)
+        return await editor._pinterest_download_board(board_url, limit)
+
+    @app.get("/api/pinterest/downloads")
+    async def pinterest_list_downloads():
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pinterest_list_downloads()
+
+    @app.post("/api/pinterest/clear")
+    async def pinterest_clear_downloads():
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pinterest_clear_downloads()
+
     return app
