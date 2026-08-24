@@ -148,12 +148,14 @@ def init_kaihara() -> CommandCenter:
     from core.workflow.engine import WorkflowEngine
     from core.workflow.workflow_store import WorkflowStore
     from core.workflow.templates import TEMPLATES
-    cc._workflow_store = WorkflowStore()
+    workflow_config = config.get("workflow", {})
+    cc._workflow_store = WorkflowStore(workflow_config.get("db_path"))
     cc._workflow_engine = WorkflowEngine(
         store=cc._workflow_store,
         approval_gate=cc._approval_gate,
         memory=memory,
         fleet_manager=cc.fleet,
+        config=workflow_config,
     )
     for name, factory in TEMPLATES.items():
         cc._workflow_engine.register_template(factory())

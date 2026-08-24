@@ -5,7 +5,7 @@ Workflow Store — SQLite persistence for workflow instances and step results.
 import json
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -74,7 +74,7 @@ class WorkflowStore:
     def create_workflow(self, workflow_id: str, name: str, template: str,
                         input_data: dict, total_steps: int,
                         approval_steps: list) -> dict:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_conn() as conn:
             conn.execute("""
                 INSERT INTO workflow_instances
@@ -88,7 +88,7 @@ class WorkflowStore:
     def create_step(self, step_id: str, workflow_id: str, step_index: int,
                     name: str, agent: str, max_retries: int = 3,
                     approval_required: bool = False) -> dict:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_conn() as conn:
             conn.execute("""
                 INSERT INTO workflow_steps
@@ -101,7 +101,7 @@ class WorkflowStore:
 
     def update_workflow_state(self, workflow_id: str, state: str,
                               reason: str = ""):
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_conn() as conn:
             if reason:
                 conn.execute("""
@@ -119,7 +119,7 @@ class WorkflowStore:
     def update_workflow_progress(self, workflow_id: str,
                                  completed_steps: int,
                                  current_step: str):
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_conn() as conn:
             conn.execute("""
                 UPDATE workflow_instances
@@ -129,7 +129,7 @@ class WorkflowStore:
 
     def update_step_state(self, step_id: str, state: str,
                           output_data: dict = None, error: str = None):
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_conn() as conn:
             if output_data:
                 conn.execute("""

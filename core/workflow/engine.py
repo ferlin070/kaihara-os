@@ -58,8 +58,10 @@ class WorkflowEngine:
     """Main workflow engine — creates, runs, pauses, resumes workflows."""
 
     def __init__(self, store: WorkflowStore = None, approval_gate=None,
-                 notify_fn=None, fleet_manager=None, memory=None):
-        self.store = store or WorkflowStore()
+                 notify_fn=None, fleet_manager=None, memory=None, config: dict = None):
+        self.config = config or {}
+        db_path = self.config.get("db_path")
+        self.store = store or WorkflowStore(db_path)
         self.approval_gate = approval_gate
         self.notify_fn = notify_fn
         self.fleet = fleet_manager
@@ -67,6 +69,7 @@ class WorkflowEngine:
         self.runner = StepRunner(self.store, approval_gate, notify_fn)
         self._templates: dict[str, WorkflowDefinition] = {}
         self._running: dict[str, asyncio.Task] = {}
+        self.max_concurrent = self.config.get("max_concurrent", 3)
 
     def register_template(self, template: WorkflowDefinition):
         """Register a workflow template."""

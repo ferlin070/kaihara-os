@@ -203,3 +203,26 @@ enabled = false
 
 [gdrive]
 enabled = false
+
+# ============================================================
+#  WORKFLOW ENGINE
+# ============================================================
+
+[workflow]
+db_path = "./data/workflows.db"
+max_concurrent = 3
+default_timeout = 300
+
+[workflow.approval]
+required_steps = ["outreach", "deploy_site"]
+timeout_seconds = 600
+
+[workflow.targets]
+demo_domain = "nakhodacloud.top"
+production_platform = "vercel"
+
+[workflow.biz_autopilot]
+default_niche = "restoran"
+default_location = "Johor Bahru"
+default_channel = "email"
+lead_scoring_threshold = 50
