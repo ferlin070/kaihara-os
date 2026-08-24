@@ -102,15 +102,7 @@ export default function DaemonView() {
     setActionLoading(null)
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-kaihara-accent animate-pulse font-mono text-sm">Loading daemon status...</div>
-      </div>
-    )
-  }
-
-  if (!status) {
+  if (!loading && !status) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-kaihara-muted text-sm">Daemon manager not available.</p>
@@ -129,32 +121,32 @@ export default function DaemonView() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-bold text-kaihara-muted uppercase">Process</h3>
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${status.watchdog_running ? 'bg-kaihara-success' : 'bg-kaihara-muted'}`} />
+              <span className={`w-2 h-2 rounded-full ${status?.watchdog_running ? 'bg-kaihara-success' : 'bg-kaihara-muted'}`} />
               <span className="text-xs text-kaihara-muted">
-                Watchdog: {status.watchdog_running ? 'ON' : 'OFF'}
+                Watchdog: {status?.watchdog_running ? 'ON' : 'OFF'}
               </span>
             </div>
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-kaihara-muted">PID</span>
-              <span className="text-kaihara-text font-mono">{status.process.pid || '--'}</span>
+              <span className="text-kaihara-text font-mono">{status?.process.pid || '--'}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-kaihara-muted">CPU</span>
-              <span className="text-kaihara-text font-mono">{status.process.cpu_percent?.toFixed(1) || '--'}%</span>
+              <span className="text-kaihara-text font-mono">{status?.process.cpu_percent?.toFixed(1) || '--'}%</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-kaihara-muted">Memory</span>
-              <span className="text-kaihara-text font-mono">{status.process.memory_mb || '--'} MB</span>
+              <span className="text-kaihara-text font-mono">{status?.process.memory_mb || '--'} MB</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-kaihara-muted">Threads</span>
-              <span className="text-kaihara-text font-mono">{status.process.threads || '--'}</span>
+              <span className="text-kaihara-text font-mono">{status?.process.threads || '--'}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-kaihara-muted">Uptime</span>
-              <span className="text-kaihara-text font-mono">{formatUptime(status.process.uptime_seconds)}</span>
+              <span className="text-kaihara-text font-mono">{formatUptime(status?.process?.uptime_seconds ?? 0)}</span>
             </div>
           </div>
         </div>
@@ -165,28 +157,28 @@ export default function DaemonView() {
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-kaihara-muted">Total</span>
-              <span className="text-kaihara-text font-mono">{status.agents.total}</span>
+              <span className="text-kaihara-text font-mono">{status?.agents.total}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-kaihara-muted">Running</span>
-              <span className="text-kaihara-success font-mono">{status.agents.running}</span>
+              <span className="text-kaihara-success font-mono">{status?.agents.running}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-kaihara-muted">Errored</span>
-              <span className="text-kaihara-danger font-mono">{status.agents.errored}</span>
+              <span className="text-kaihara-danger font-mono">{status?.agents.errored}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-kaihara-muted">Stopped</span>
-              <span className="text-kaihara-muted font-mono">{status.agents.stopped}</span>
+              <span className="text-kaihara-muted font-mono">{status?.agents.stopped}</span>
             </div>
           </div>
           <div className="flex gap-2 mt-3">
             <button
-              onClick={() => handleWatchdog(!status.watchdog_running)}
+              onClick={() => handleWatchdog(!status?.watchdog_running)}
               disabled={actionLoading === 'watchdog'}
               className="flex-1 px-2 py-1.5 text-xs bg-kaihara-border text-kaihara-text rounded hover:bg-kaihara-border/80 disabled:opacity-50"
             >
-              {status.watchdog_running ? 'Stop Watchdog' : 'Start Watchdog'}
+              {status?.watchdog_running ? 'Stop Watchdog' : 'Start Watchdog'}
             </button>
             <button
               onClick={handleRestartAll}
@@ -228,7 +220,7 @@ export default function DaemonView() {
       <div className="hud-panel">
         <h3 className="text-xs font-bold text-kaihara-muted uppercase mb-3">Services</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {(status.services || []).map((service: any) => (
+          {(status?.services || []).map((service: any) => (
             <ServiceCard
               key={service.name}
               service={service}
@@ -240,11 +232,11 @@ export default function DaemonView() {
       </div>
 
       {/* Restart History */}
-      {(status.restart_history || []).length > 0 && (
+      {(status?.restart_history || []).length > 0 && (
         <div className="hud-panel">
           <h3 className="text-xs font-bold text-kaihara-muted uppercase mb-3">Restart History</h3>
           <div className="space-y-1 max-h-40 overflow-y-auto">
-            {(status.restart_history || []).slice().reverse().slice(0, 10).map((entry, i) => (
+            {(status?.restart_history || []).slice().reverse().slice(0, 10).map((entry, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className="text-kaihara-muted font-mono">{entry.time?.slice(11, 19)}</span>
                 <span className="text-kaihara-accent">{entry.agent}</span>

@@ -46,13 +46,15 @@ export default function App() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const s = await getStatus()
+      const [s, mapData] = await Promise.all([
+        getStatus(),
+        getMapState().catch(() => ({ agents: {} })),
+      ])
       failCountRef.current = 0
       setStatus(s)
       if (s.fleet_agents) {
-        const mapData = await getMapState()
         const agentStatus = s.fleet_agents.map(name => {
-          const mapAgent = mapData.agents[name]
+          const mapAgent = (mapData.agents as Record<string, any>)?.[name]
           return { name, status: mapAgent?.status || 'idle', task: mapAgent?.task || '', progress: mapAgent?.progress || 0 }
         })
         setAgents(agentStatus)

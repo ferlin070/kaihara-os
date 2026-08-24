@@ -858,6 +858,34 @@ def create_app(command_center) -> FastAPI:
         reason = (payload or {}).get("reason", "")
         return await gate.deny(request_id, reason)
 
+    # ============================================================
+    # Landing Page Deployment (web-hosting CT 100)
+    # ============================================================
+
+    @app.get("/api/deploy/landing")
+    async def landing_sites():
+        from core.tools.deploy_tools import list_landing_sites
+        return list_landing_sites()
+
+    @app.post("/api/deploy/landing")
+    async def deploy_landing_page(payload: dict):
+        from core.tools.deploy_tools import deploy_landing
+        name = payload.get("name", "")
+        html = payload.get("html", "")
+        if not name or not html:
+            return {"ok": False, "error": "name dan html diperlukan"}
+        return await asyncio.to_thread(deploy_landing, name, html)
+
+    @app.get("/api/deploy/landing/{name}")
+    async def get_landing(name: str):
+        from core.tools.deploy_tools import get_landing_html
+        return get_landing_html(name)
+
+    @app.delete("/api/deploy/landing/{name}")
+    async def remove_landing(name: str):
+        from core.tools.deploy_tools import delete_landing_site
+        return delete_landing_site(name)
+
     @app.post("/api/security/approvals/demo")
     async def create_demo_approval():
         """Create a test approval request (for exercising the approve/deny flow)."""

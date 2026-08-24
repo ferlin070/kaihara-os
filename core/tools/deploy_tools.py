@@ -574,3 +574,113 @@ def record_deploy(action: str, result: dict, user: str = "system") -> None:
 def get_deploy_history(limit: int = 20) -> list:
     """Get recent deployment history."""
     return _deploy_history[-limit:]
+
+
+# ============================================================
+# Landing Page Deployment — web-hosting (CT 100)
+# Deploy landing pages ke *.nakhodacloud.top
+# ============================================================
+
+WEB_HOST = "192.168.1.21"
+WEB_ROOT = "/var/www"
+DOMAIN_SUFFIX = ".nakhodacloud.top"
+
+
+def _ssh_host(cmd: str, timeout: int = 30) -> dict:
+    """Run command on web-hosting via SSH."""
+    try:
+        result = subprocess.run(
+            ["ssh", "-o", "StrictHostKeyChecking=no",
+             "-o", "ConnectTimeout=8", f"root@{WEB_HOST}", cmd],
+            capture_output=True, text=True, timeout=timeout,
+        )
+        return {
+            "ok": result.returncode == 0,
+            "stdout": result.stdout,
+            "error": result.stderr if result.returncode != 0 else "",
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"SSH timeout after {timeout}s"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def list_landing_sites() -> dict:
+    """List all hosted sites on web-hosting."""
+    r = _ssh_host(
+        f"for d in {WEB_ROOT}/*{DOMAIN_SUFFIX}/; do "
+        "[ -d \"$d\" ] && echo \"$(basename $d)|$(du -sh $d | cut -f1)"
+        "|$(stat -c %y $d | cut -d' ' -f1)\"; done"
+    )
+    if not r["ok"]:
+        return {"ok": False, "error": r.get("error", "SSH failed")}
+    sites = []
+    for line in r["stdout"].strip().splitlines():
+        parts = line.split("|")
+        if len(parts) == 3:
+            sites.append({
+                "domain": parts[0],
+                "size": parts[1],
+                "modified": parts[2],
+                "url": f"https://{parts[0]}",
+            })
+    return {"ok": True, "sites": sites, "count": len(sites)}
+
+
+def deploy_landing(name: str, html: str, overwrite: bool = True) -> dict:
+    """Deploy a landing page to <name>.nakhodacloud.top.
+
+    Creates /var/www/<name>.nakhodacloud.top/index.html via SSH.
+    Wildcard nginx + Cloudflare DNS handle the rest automatically.
+    """
+    import re as _re
+    name = name.strip().lower()
+    name = _re.sub(r"[^a-z0-9-]", "-", name).strip("-")
+    if not name:
+        return {"ok": False, "error": "Invalid site name"}
+    domain = f"{name}{DOMAIN_SUFFIX}"
+
+    # Write files via SSH: mkdir, write index.html, set perms
+    html_b64 = html.encode("utf-8").hex()  # hex avoids quoting issues
+    cmd = (
+        f"mkdir -p {WEB_ROOT}/{domain} && "
+        f"echo '{html_b64}' | xxd -r -p > {WEB_ROOT}/{domain}/index.html && "
+        f"chmod 755 {WEB_ROOT}/{domain} && "
+        f"chmod 644 {WEB_ROOT}/{domain}/index.html && "
+        f"echo DEPLOYED"
+    )
+    r = _ssh_host(cmd, timeout=20)
+    if not r.get("ok") or "DEPLOYED" not in r.get("stdout", ""):
+        return {"ok": False, "error": r.get("error") or "Deploy failed"}
+
+    # Verify reachable
+    import time as _time
+    _time.sleep(2)
+
+    return {
+        "ok": True,
+        "domain": domain,
+        "url": f"https://{domain}",
+        "path": f"{WEB_ROOT}/{domain}",
+        "message": f"Landing page live at https://{domain}",
+    }
+
+
+def delete_landing_site(name: str) -> dict:
+    """Delete a landing page site."""
+    import re as _re
+    name = _re.sub(r"[^a-z0-9-]", "", name.strip().lower())
+    domain = f"{name}{DOMAIN_SUFFIX}"
+    r = _ssh_host(f"rm -rf {WEB_ROOT}/{domain}")
+    if not r["ok"]:
+        return {"ok": False, "error": r.get("error")}
+    return {"ok": True, "deleted": domain}
+
+
+def get_landing_html(name: str) -> dict:
+    """Fetch current index.html of a site."""
+    domain = f"{name}{DOMAIN_SUFFIX}"
+    r = _ssh_host(f"cat {WEB_ROOT}/{domain}/index.html 2>/dev/null || echo NOT_FOUND")
+    if "NOT_FOUND" in r.get("stdout", ""):
+        return {"ok": False, "error": f"{domain}: index.html not found"}
+    return {"ok": True, "domain": domain, "html": r.get("stdout", "")}

@@ -1341,3 +1341,38 @@ export async function resetMap(): Promise<any> {
   const res = await fetch(`${API_BASE}/viz/reset`, { method: 'POST' })
   return res.json()
 }
+
+// ============================================================
+// Landing Pages (web-hosting CT 100)
+// ============================================================
+
+export interface LandingSite {
+  domain: string
+  url: string
+  size?: string
+  modified?: string
+}
+
+export async function getLandingSites(): Promise<{ ok: boolean; sites: LandingSite[] }> {
+  const base = getApiBase()
+  const res = await fetch(`${base.replace('/api', '')}/api/deploy/landing`)
+  return res.json()
+}
+
+export async function deployLanding(name: string, html: string): Promise<any> {
+  const base = getApiBase()
+  const res = await fetch(`${base.replace('/api', '')}/api/deploy/landing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, html }),
+  })
+  return res.json()
+}
+
+export async function deleteLandingSite(name: string): Promise<any> {
+  const base = getApiBase()
+  const res = await fetch(`${base.replace('/api', '')}/api/deploy/landing/${name}`, {
+    method: 'DELETE',
+  })
+  return res.json()
+}
