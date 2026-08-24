@@ -73,20 +73,31 @@ class PinterestTools:
             from pinterest_downloader import Pinterest
 
             p = Pinterest()
+            # Lib API: search(query, page_size=25) / get_board_pins(url, page_size=25)
             if query:
-                results = p.search(query, limit=limit)
+                results = p.search(query, page_size=limit)
             elif board_url:
-                results = p.get_board_pins(board_url, limit=limit)
+                results = p.get_board_pins(board_url, page_size=limit)
             else:
                 return {"ok": False, "error": "query or board_url required"}
 
+            pins = results.get("pins", []) if isinstance(results, dict) else []
             files = []
-            for pin in results.get("pins", []):
-                title = pin.get("title", "untitled")
+            for pin in pins:
+                if not isinstance(pin, dict):
+                    continue
+                title = str(pin.get("title") or pin.get("description")
+                            or "untitled")[:60]
                 media_type = pin.get("media_type", "image")
-                img_url = pin.get("image", {}).get("orig", "")
+                img = pin.get("image")
+                if isinstance(img, dict):
+                    img_url = img.get("orig") or img.get("medium") or ""
+                else:
+                    img_url = str(img or "")
+                if not img_url and pin.get("url"):
+                    img_url = pin["url"]
 
-                filename = f"{title[:50]}_{hash(img_url) % 10000}.jpg"
+                filename = f"{title[:50]}_{abs(hash(img_url)) % 10000}.jpg"
                 local_path = os.path.join(self._media_dir, filename)
 
                 files.append({
@@ -96,7 +107,10 @@ class PinterestTools:
                     "local_path": local_path,
                 })
 
-            return {"ok": True, "files": files, "total": len(files)}
+            note = ("Pinterest may require login cookies for search "
+                    "results." ) if not files else ""
+            return {"ok": True, "files": files, "total": len(files),
+                    "note": note}
         except ImportError:
             return {"ok": False, "error": "pinterest_downloader not installed"}
         except Exception as e:
