@@ -169,7 +169,7 @@ function SkillsTab() {
               </div>
               <p className="text-xs text-kaihara-muted mt-1">{skill.description}</p>
               <div className="flex flex-wrap gap-1 mt-2">
-                {skill.tags.slice(0, 4).map((tag, i) => (
+                {(Array.isArray(skill.tags) ? skill.tags : String(skill.tags || '').split(',').filter(Boolean)).slice(0, 4).map((tag: any, i: number) => (
                   <span key={i} className="text-xs bg-kaihara-bg px-1.5 py-0.5 rounded text-kaihara-muted">
                     {tag}
                   </span>
@@ -353,7 +353,7 @@ function PromptsTab() {
                 {prompt.content.slice(0, 200)}{prompt.content.length > 200 ? '...' : ''}
               </pre>
               <div className="flex flex-wrap gap-1 mt-2">
-                {prompt.tags.map((tag, i) => (
+                {(Array.isArray(prompt.tags) ? prompt.tags : []).map((tag: any, i: number) => (
                   <span key={i} className="text-xs bg-kaihara-bg px-1.5 py-0.5 rounded text-kaihara-muted">
                     {tag}
                   </span>

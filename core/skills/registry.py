@@ -85,7 +85,7 @@ class SkillRegistry:
             "name": metadata.get("name", skill_id),
             "description": metadata.get("description", ""),
             "category": metadata.get("category", "general"),
-            "tags": metadata.get("tags", []),
+            "tags": self._sanitize_tags(metadata.get("tags", [])),
             "source": metadata.get("source", "custom"),
             "version": metadata.get("version", "1.0.0"),
             "installed_at": datetime.now().isoformat(),
@@ -116,6 +116,15 @@ class SkillRegistry:
         for s in index.get("skills", []):
             cats.add(s.get("category", "general"))
         return sorted(cats)
+
+    @staticmethod
+    def _sanitize_tags(tags) -> list:
+        """Ensure tags is always a clean list[str]."""
+        if isinstance(tags, list):
+            return [str(t).strip() for t in tags if str(t).strip()]
+        if isinstance(tags, str):
+            return [t.strip() for t in tags.split(",") if t.strip()]
+        return []
 
     def stats(self) -> dict:
         """Get skill registry statistics."""
