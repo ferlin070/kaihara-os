@@ -3,7 +3,6 @@ import type { Msg } from '../App'
 import { getVoiceStatus, speak, type VoiceStatus } from '../lib/api'
 import MarkdownRenderer from './MarkdownRenderer'
 
-// Web Speech API types
 interface SpeechRecognitionLike {
   lang: string
   continuous: boolean
@@ -47,7 +46,6 @@ export default function Conversation({
     typeof window !== 'undefined' &&
     !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
 
-  // Scroll only within chat container, not the page
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -61,7 +59,6 @@ export default function Conversation({
     }
   }, [])
 
-  // Speak new Kaihara replies using server neural TTS when enabled
   const lastCountRef = useRef(0)
   useEffect(() => {
     if (!speakReplies) {
@@ -104,13 +101,11 @@ export default function Conversation({
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const t = e.results[i][0].transcript
           if (e.results[i].isFinal) {
-            // Accumulate — don't send yet
             transcriptRef.current += t.trim() + ' '
           } else {
             interimText += t
           }
         }
-        // Show live preview in input box
         setInput((transcriptRef.current + interimText).trim())
         setInterim(interimText)
       }
@@ -146,7 +141,6 @@ export default function Conversation({
     try { recognitionRef.current?.stop() } catch {}
     setListening(false)
     setInterim('')
-    // Send everything that was said, once
     const full = transcriptRef.current.trim()
     transcriptRef.current = ''
     if (full) {
@@ -160,120 +154,156 @@ export default function Conversation({
   const voiceAvailable = voiceStatus?.tts?.available
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div className="flex-1 flex flex-col h-full">
       {/* Voice status bar */}
       {voiceStatus && voiceStatus.available && (
-        <div className="flex-shrink-0 px-4 py-1.5 border-b border-kaihara-border flex items-center justify-between text-xs">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5">
+        <div className="flex-shrink-0 px-6 py-2 border-b border-kaihara-border flex items-center justify-between text-xs bg-kaihara-surface/50">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-2">
               <span className={`status-dot ${sttAvailable ? 'bg-kaihara-success' : voiceStatus.stt.available ? 'bg-kaihara-success' : 'bg-kaihara-danger'}`} />
-              STT: {sttAvailable ? 'browser' : voiceStatus.stt.engine}
+              <span className="text-kaihara-muted">STT:</span> {sttAvailable ? 'browser' : voiceStatus.stt.engine}
             </span>
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-2">
               <span className={`status-dot ${voiceStatus.tts.available ? 'bg-kaihara-success' : 'bg-kaihara-danger'}`} />
-              TTS: {voiceStatus.tts.engine}
+              <span className="text-kaihara-muted">TTS:</span> {voiceStatus.tts.engine}
             </span>
           </div>
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <label className="flex items-center gap-2 cursor-pointer select-none text-kaihara-muted hover:text-kaihara-text transition-colors">
             <input
               type="checkbox"
               checked={speakReplies}
               onChange={(e) => setSpeakReplies(e.target.checked)}
-              className="accent-kaihara-accent"
+              className="w-4 h-4 rounded border-kaihara-border bg-kaihara-surface text-kaihara-primary focus:ring-kaihara-primary/20"
             />
             Auto-speak replies
           </label>
         </div>
       )}
 
-      {/* Messages — scroll dalam container ini sahaja */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 p-4 space-y-3">
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 p-6">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-2xl">
+            <div className="text-center animate-fade-in">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-3xl shadow-glow">
                 K
               </div>
-              <p className="text-kaihara-muted text-sm">Kaihara online. How can I help?</p>
-              {sttAvailable && <p className="text-kaihara-muted text-xs mt-2">Click MIC and speak — works from any device.</p>}
+              <h2 className="text-xl font-semibold mb-2">Kaihara Online</h2>
+              <p className="text-kaihara-muted text-sm max-w-xs mx-auto">
+                Your personal AI super-intelligence. Ask me anything.
+              </p>
+              {sttAvailable && (
+                <p className="text-kaihara-subtle text-xs mt-4">
+                  Click the mic button to speak
+                </p>
+              )}
             </div>
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className="max-w-[75%]">
-              {msg.role === 'kaihara' && (
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-xs">
-                    K
+        <div className="max-w-3xl mx-auto space-y-6">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}>
+              <div className={`max-w-[80%] ${msg.role === 'user' ? 'order-2' : 'order-1'}`}>
+                {msg.role === 'kaihara' && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-xs">
+                      K
+                    </div>
+                    <span className="text-xs font-medium text-kaihara-muted">Kaihara</span>
                   </div>
-                  <span className="text-xs text-kaihara-muted">Kaihara</span>
-                </div>
-              )}
-              <div className={`rounded-lg px-4 py-2.5 ${
-                msg.role === 'user'
-                  ? 'bg-kaihara-primary text-white'
-                  : 'bg-kaihara-surface border border-kaihara-border'
-              }`}>
-                {msg.role === 'kaihara' ? (
-                  <MarkdownRenderer content={msg.text} />
-                ) : (
-                  <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
                 )}
-                {(msg.route || msg.provider) && <p className="text-xs opacity-60 mt-1.5">{msg.route && <>route: {msg.route}</>}{msg.route && msg.provider && ' · '}{msg.provider && <>via {msg.provider}</>}</p>}
+                <div className={`rounded-2xl px-5 py-3 ${
+                  msg.role === 'user'
+                    ? 'bg-kaihara-primary text-white rounded-br-md'
+                    : 'bg-kaihara-surface border border-kaihara-border rounded-bl-md'
+                }`}>
+                  {msg.role === 'kaihara' ? (
+                    <MarkdownRenderer content={msg.text} />
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.text}</p>
+                  )}
+                  {(msg.route || msg.provider) && (
+                    <p className="text-xs opacity-50 mt-2 pt-2 border-t border-current/10">
+                      {msg.route && <>route: {msg.route}</>}
+                      {msg.route && msg.provider && ' · '}
+                      {msg.provider && <>via {msg.provider}</>}
+                    </p>
+                  )}
+                </div>
+                {msg.role === 'kaihara' && msg.text && (
+                  <button 
+                    onClick={() => handleSpeak(msg.text)} 
+                    className="mt-2 ml-9 text-xs text-kaihara-subtle hover:text-kaihara-primary transition-colors flex items-center gap-1"
+                  >
+                    <span>🔊</span> Listen
+                  </button>
+                )}
               </div>
-              {msg.role === 'kaihara' && msg.text && (
-                <button onClick={() => handleSpeak(msg.text)} className="mt-1 ml-1 text-xs text-kaihara-muted hover:text-kaihara-accent transition-colors">
-                  🔊 Say it
-                </button>
-              )}
             </div>
-          </div>
-        ))}
+          ))}
 
-        {thinking && (
-          <div className="flex justify-start">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-xs">K</div>
-            </div>
-            <div className="bg-kaihara-surface border border-kaihara-border rounded-lg px-4 py-3 ml-8">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-kaihara-accent rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-kaihara-accent rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-kaihara-accent rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          {thinking && (
+            <div className="flex justify-start animate-fade-in">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-xs">K</div>
+              </div>
+              <div className="bg-kaihara-surface border border-kaihara-border rounded-2xl rounded-bl-md px-5 py-4 ml-9">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 bg-kaihara-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-kaihara-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-kaihara-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Input — fixed di bawah */}
-      <div className="flex-shrink-0 border-t border-kaihara-border p-3 bg-kaihara-bg">
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
-          <button type="button" onClick={listening ? stopListening : startListening}
-            disabled={!sttAvailable}
-            className={`flex-shrink-0 p-2.5 rounded-lg transition-colors ${
-              listening ? 'bg-kaihara-danger text-white animate-pulse' : sttAvailable ? 'bg-kaihara-border text-kaihara-muted hover:text-kaihara-accent' : 'bg-kaihara-border text-kaihara-muted opacity-50 cursor-not-allowed'
-            }`} title={listening ? 'Stop listening' : sttAvailable ? 'Speak (browser mic)' : 'Browser does not support speech recognition'}>
-            🎙️
-          </button>
-          <input type="text" value={input} onChange={(e) => { if (!listening) setInput(e.target.value) }}
-            placeholder={listening ? '🔴 Recording... tekan STOP untuk hantar' : 'Type message...'}
-            className="flex-1 bg-kaihara-surface border border-kaihara-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-kaihara-accent min-w-0"
-            autoFocus />
-          <button type="submit" disabled={!input.trim() || thinking} className="flex-shrink-0 btn-primary disabled:opacity-50">
-            Send
-          </button>
-        </form>
-        {listening && (
-          <div className="mt-2 flex items-center justify-center gap-1 h-8">
-            {Array.from({ length: 30 }).map((_, i) => (
-              <span key={i} className="waveform-bar" style={{ animationDelay: `${i * 40}ms` }} />
-            ))}
-            <span className="ml-3 text-xs text-kaihara-danger animate-pulse">REC{interim ? '' : '...'}</span>
-          </div>
-        )}
+      {/* Input Area */}
+      <div className="flex-shrink-0 border-t border-kaihara-border p-4 bg-kaihara-surface/30">
+        <div className="max-w-3xl mx-auto">
+          <form onSubmit={handleSubmit} className="flex items-center gap-3">
+            <button 
+              type="button" 
+              onClick={listening ? stopListening : startListening}
+              disabled={!sttAvailable}
+              className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                listening 
+                  ? 'bg-kaihara-danger text-white animate-pulse' 
+                  : sttAvailable 
+                    ? 'bg-kaihara-surface border border-kaihara-border text-kaihara-muted hover:text-kaihara-primary hover:border-kaihara-primary/30' 
+                    : 'bg-kaihara-surface border border-kaihara-border text-kaihara-muted opacity-50 cursor-not-allowed'
+              }`} 
+              title={listening ? 'Stop listening' : sttAvailable ? 'Speak (browser mic)' : 'Browser does not support speech recognition'}
+            >
+              🎙️
+            </button>
+            <input 
+              type="text" 
+              value={input} 
+              onChange={(e) => { if (!listening) setInput(e.target.value) }}
+              placeholder={listening ? 'Recording... press stop to send' : 'Message Kaihara...'}
+              className="input flex-1"
+              autoFocus 
+            />
+            <button 
+              type="submit" 
+              disabled={!input.trim() || thinking} 
+              className="flex-shrink-0 btn-primary disabled:opacity-40 disabled:cursor-not-allowed h-10 px-5"
+            >
+              Send
+            </button>
+          </form>
+          {listening && (
+            <div className="mt-3 flex items-center justify-center gap-1 h-8">
+              {Array.from({ length: 30 }).map((_, i) => (
+                <span key={i} className="waveform-bar" style={{ animationDelay: `${i * 40}ms` }} />
+              ))}
+              <span className="ml-3 text-xs text-kaihara-danger animate-pulse font-medium">REC{interim ? '' : '...'}</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

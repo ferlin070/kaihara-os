@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,7 +10,7 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #1f2937 transparent;
+  scrollbar-color: #2a2a2a transparent;
 }
 
 *::-webkit-scrollbar {
@@ -20,35 +22,61 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #1f2937;
+  background: #2a2a2a;
   border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
 }
 
 body {
   margin: 0;
-  font-family: "JetBrains Mono", "Consolas", monospace;
-  background: #0a0e1a;
-  color: #e5e7eb;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: #0f0f0f;
+  color: #f5f5f5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer components {
-  .hud-panel {
-    @apply bg-kaihara-surface border border-kaihara-border rounded-lg p-4;
+  .card {
+    @apply bg-kaihara-card border border-kaihara-border rounded-xl p-4 transition-all duration-200;
   }
-  .hud-title {
-    @apply text-xs uppercase tracking-wider text-kaihara-muted mb-3;
+  .card-hover {
+    @apply card hover:border-kaihara-primary/30 hover:shadow-glow cursor-pointer;
+  }
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-success {
+    @apply badge bg-kaihara-success/10 text-kaihara-success;
+  }
+  .badge-warning {
+    @apply badge bg-kaihara-warning/10 text-kaihara-warning;
+  }
+  .badge-danger {
+    @apply badge bg-kaihara-danger/10 text-kaihara-danger;
+  }
+  .badge-primary {
+    @apply badge bg-kaihara-primary/10 text-kaihara-primary;
+  }
+  .btn {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200;
+  }
+  .btn-primary {
+    @apply btn bg-kaihara-primary hover:bg-kaihara-primary/90 text-white shadow-sm;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-kaihara-hover text-kaihara-muted hover:text-kaihara-text;
+  }
+  .input {
+    @apply w-full bg-kaihara-surface border border-kaihara-border rounded-lg px-4 py-2.5 text-sm 
+           focus:outline-none focus:border-kaihara-primary focus:ring-1 focus:ring-kaihara-primary/20
+           placeholder:text-kaihara-muted transition-all duration-200;
   }
   .status-dot {
     @apply inline-block w-2 h-2 rounded-full;
-  }
-  .btn {
-    @apply px-3 py-1.5 rounded text-sm font-medium transition-colors;
-  }
-  .btn-primary {
-    @apply btn bg-kaihara-primary hover:bg-blue-600 text-white;
-  }
-  .btn-ghost {
-    @apply btn bg-transparent hover:bg-kaihara-border text-kaihara-text;
   }
 }
 
@@ -56,7 +84,7 @@ body {
   display: inline-block;
   width: 3px;
   margin: 0 1px;
-  background: #06b6d4;
+  background: #a78bfa;
   border-radius: 2px;
   animation: wave 0.8s ease-in-out infinite;
 }

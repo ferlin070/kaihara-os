@@ -32,16 +32,31 @@ export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string; prov
 
 const ACTIVE_CONV_KEY = 'kaihara_active_conv'
 
+const TABS = [
+  { id: 'chat' as const, label: 'Chat', icon: '💬' },
+  { id: 'map' as const, label: 'Map', icon: '🗺️' },
+  { id: 'tasks' as const, label: 'Tasks', icon: '📋' },
+  { id: 'skills' as const, label: 'Skills', icon: '⚡' },
+  { id: 'security' as const, label: 'Security', icon: '🔒' },
+  { id: 'memory' as const, label: 'Memory', icon: '🧠' },
+  { id: 'daemon' as const, label: 'Daemon', icon: '⚙️' },
+  { id: 'marketing' as const, label: 'Marketing', icon: '📈' },
+  { id: 'deploy' as const, label: 'Deploy', icon: '🚀' },
+  { id: 'editor' as const, label: 'Editor', icon: '✏️' },
+  { id: 'workflows' as const, label: 'Workflows', icon: '🔄' },
+]
+
 export default function App() {
   const [status, setStatus] = useState<Status | null>(null)
   const [messages, setMessages] = useState<Msg[]>([])
   const [thinking, setThinking] = useState(false)
   const [agents, setAgents] = useState<{name: string; status: string; task: string; progress: number}[]>([])
   const [notifications, setNotifications] = useState<{type: string; text: string}[]>([])
-  const [activeTab, setActiveTab] = useState<'chat' | 'map' | 'tasks' | 'skills' | 'security' | 'memory' | 'daemon' | 'marketing' | 'deploy' | 'editor' | 'workflows'>('chat')
+  const [activeTab, setActiveTab] = useState<typeof TABS[number]['id']>('chat')
   const [activeConvId, setActiveConvId] = useState<string>(
     () => localStorage.getItem(ACTIVE_CONV_KEY) || 'dashboard')
   const [conversations, setConversations] = useState<Conv[]>([])
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const failCountRef = useRef(0)
 
@@ -61,7 +76,6 @@ export default function App() {
         setAgents(agentStatus)
       }
     } catch {
-      // Keep last known status — only show OFFLINE after 4 consecutive failures (~1 min)
       failCountRef.current += 1
       if (failCountRef.current >= 4) setStatus(null)
     }
@@ -73,7 +87,6 @@ export default function App() {
     return () => clearInterval(interval)
   }, [fetchStatus])
 
-  // Load conversation list
   const fetchConversations = useCallback(async () => {
     try {
       const data = await getConversations()
@@ -81,7 +94,6 @@ export default function App() {
     } catch {}
   }, [])
 
-  // Load chat history for active conversation: localStorage first, then server
   useEffect(() => {
     localStorage.setItem(ACTIVE_CONV_KEY, activeConvId)
     try {
@@ -101,7 +113,6 @@ export default function App() {
     fetchConversations()
   }, [activeConvId, fetchConversations])
 
-  // Persist to localStorage on every change
   useEffect(() => {
     try {
       localStorage.setItem(`kaihara_chat_${activeConvId}`, JSON.stringify(messages.slice(-200)))
@@ -116,7 +127,6 @@ export default function App() {
       fetchConversations()
       setActiveTab('chat')
     } catch {
-      // Offline fallback: temp local id
       setActiveConvId(`c_local_${Date.now()}`)
       setMessages([])
       setActiveTab('chat')
@@ -151,7 +161,7 @@ export default function App() {
     try {
       const res = await sendMessage(text, 'dashboard', activeConvId)
       setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route, provider: (res as any).provider }])
-      fetchConversations() // refresh order + message count + auto-title
+      fetchConversations()
     } catch {
       setMessages(prev => [...prev, { role: 'kaihara', text: '[Connection error. Is Kaihara server running on :7000?]' }])
     }
@@ -159,67 +169,98 @@ export default function App() {
   }
 
   return (
-    // Root: full viewport, NO scroll on body
-    <div className="h-screen flex flex-col bg-kaihara-bg text-kaihara-text overflow-hidden">
-      {/* Header — fixed height */}
-      <header className="flex-shrink-0 border-b border-kaihara-border px-6 py-2.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-sm">K</div>
-          <div>
-            <h1 className="text-lg font-bold tracking-wide">KAIHARA OS</h1>
-            <p className="text-xs text-kaihara-muted">Personal AI Super-Intelligence</p>
+    <div className="h-screen flex bg-kaihara-bg text-kaihara-text overflow-hidden">
+      {/* Left Sidebar */}
+      <aside className={`${sidebarOpen ? 'w-72' : 'w-16'} flex-shrink-0 border-r border-kaihara-border flex flex-col transition-all duration-300`}>
+        {/* Logo */}
+        <div className="h-16 flex items-center gap-3 px-4 border-b border-kaihara-border">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+            K
           </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {status?.kaihara_online ? (
-            <span className="flex items-center gap-2 text-xs text-kaihara-success">
-              <span className="status-dot bg-kaihara-success animate-pulse" />ONLINE
-            </span>
-          ) : (
-            <span className="flex items-center gap-2 text-xs text-kaihara-danger">
-              <span className="status-dot bg-kaihara-danger" />OFFLINE
-            </span>
+          {sidebarOpen && (
+            <div className="animate-fade-in">
+              <h1 className="text-lg font-bold tracking-tight">KAIHARA</h1>
+              <p className="text-xs text-kaihara-muted">AI Super-Intelligence</p>
+            </div>
           )}
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="ml-auto p-2 rounded-lg hover:bg-kaihara-hover text-kaihara-muted transition-colors"
+          >
+            {sidebarOpen ? '◀' : '▶'}
+          </button>
         </div>
-      </header>
 
-      {/* Main — fills remaining height, NO page scroll */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar — scroll dalam diri sendiri */}
-        <aside className="w-64 flex-shrink-0 border-r border-kaihara-border p-3 overflow-y-auto space-y-3">
-          <ChatSessions
-            conversations={conversations}
-            activeConvId={activeConvId}
-            onSelect={handleSelectConv}
-            onNewChat={handleNewChat}
-            onRename={handleRenameConv}
-            onDelete={handleDeleteConv}
-          />
-          <KaiharaStatus thinking={thinking} online={!!status?.kaihara_online} />
-          <SystemStatsWidget />
-          <ChannelStatus />
-          <KernelStatus />
-          <MetaPanel />
-          <SystemStatus status={status} />
-          <AgentActivity agents={agents} />
-        </aside>
+        {/* Chat Sessions */}
+        {sidebarOpen && (
+          <div className="flex-1 overflow-y-auto p-3">
+            <ChatSessions
+              conversations={conversations}
+              activeConvId={activeConvId}
+              onSelect={handleSelectConv}
+              onNewChat={handleNewChat}
+              onRename={handleRenameConv}
+              onDelete={handleDeleteConv}
+            />
+          </div>
+        )}
 
-        {/* Center — flex-1, tab content manages own scroll */}
-        <main className="flex-1 flex flex-col min-w-0">
-          {/* Tabs — fixed height */}
-          <div className="flex-shrink-0 flex border-b border-kaihara-border">
-            {(['chat', 'map', 'tasks', 'skills', 'security', 'memory', 'daemon', 'marketing', 'deploy', 'editor', 'workflows'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-5 py-2.5 text-sm font-medium uppercase tracking-wide transition-colors ${
-                  activeTab === tab ? 'text-kaihara-accent border-b-2 border-kaihara-accent' : 'text-kaihara-muted hover:text-kaihara-text'
-                }`}>
-                {tab}
+        {/* Status Panels */}
+        {sidebarOpen && (
+          <div className="border-t border-kaihara-border p-3 space-y-3 max-h-64 overflow-y-auto">
+            <KaiharaStatus thinking={thinking} online={!!status?.kaihara_online} />
+            <SystemStatsWidget />
+            <ChannelStatus />
+          </div>
+        )}
+      </aside>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Bar */}
+        <header className="h-16 flex items-center justify-between px-6 border-b border-kaihara-border flex-shrink-0">
+          <div className="flex items-center gap-4">
+            {status?.kaihara_online ? (
+              <span className="badge-success">
+                <span className="status-dot bg-kaihara-success animate-pulse mr-1.5" />
+                Online
+              </span>
+            ) : (
+              <span className="badge-danger">
+                <span className="status-dot bg-kaihara-danger mr-1.5" />
+                Offline
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <KernelStatus />
+            <MetaPanel />
+          </div>
+        </header>
+
+        {/* Tabs */}
+        <div className="flex-shrink-0 border-b border-kaihara-border px-4">
+          <div className="flex gap-1 overflow-x-auto">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all duration-200 border-b-2 -mb-px ${
+                  activeTab === tab.id
+                    ? 'text-kaihara-primary border-kaihara-primary'
+                    : 'text-kaihara-muted border-transparent hover:text-kaihara-text hover:border-kaihara-border'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Tab content — fills remaining, each tab manages own scroll */}
-          <div className="flex-1 min-h-0 flex flex-col">
+        {/* Tab Content */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="h-full overflow-y-auto">
             {activeTab === 'chat' && <Conversation messages={messages} thinking={thinking} onSend={handleSend} />}
             {activeTab === 'map' && <AgentMap />}
             {activeTab === 'tasks' && <TaskBoard />}
@@ -232,17 +273,20 @@ export default function App() {
             {activeTab === 'editor' && <EditorView />}
             {activeTab === 'workflows' && <WorkflowDashboard />}
           </div>
-        </main>
+        </div>
+      </div>
 
-        {/* Right Sidebar — scroll dalam diri sendiri */}
-        <aside className="w-72 flex-shrink-0 border-l border-kaihara-border p-3 overflow-y-auto space-y-3">
+      {/* Right Sidebar */}
+      <aside className="w-80 flex-shrink-0 border-l border-kaihara-border overflow-y-auto">
+        <div className="p-4 space-y-4">
           <MorningBriefing />
           <PendingApprovals />
           <GoalsTracker />
           <NotificationPanel notifications={notifications} />
-        </aside>
-      </div>
+          <AgentActivity agents={agents} />
+          <SystemStatus status={status} />
+        </div>
+      </aside>
     </div>
   )
 }
-
