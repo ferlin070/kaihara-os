@@ -1083,12 +1083,15 @@ async def test_editor_agent():
     agent = EditorAgent(config={"media_dir": "/tmp/media"})
     st = agent.status()
     tools = st.get("tools", [])
-    assert len(tools) >= 29, f"Too few tools: {len(tools)}"
+    assert len(tools) >= 39, f"Too few tools: {len(tools)}"
     print(f"    Editor agent tools: {len(tools)}")
     expected = ["video_trim", "video_concat", "generate_poster",
                 "search_stock_image", "image_resize",
                 "gdrive_search_media", "gdrive_browse_folder",
-                "pinterest_search", "pinterest_download_pin"]
+                "pinterest_search", "pinterest_download_pin",
+                "video_speed", "video_crop", "video_to_gif",
+                "video_color_grade", "video_remove_audio",
+                "video_add_voiceover", "get_curated_photos", "get_popular_videos"]
     for t in expected:
         assert t in tools, f"Missing tool: {t}"
     print(f"    All expected tools present")
@@ -1105,6 +1108,38 @@ async def test_editor_video_probe():
     return True
 
 test("Editor: video probe", test_editor_video_probe)
+
+async def test_editor_new_video_tools():
+    from core.tools.media_tools import (
+        video_speed, video_crop, video_to_gif,
+        video_color_grade, video_remove_audio,
+    )
+    # Test with non-existent file (should fail gracefully)
+    r = video_speed("/tmp/nonexistent.mp4", "/tmp/out.mp4", 2.0)
+    assert not r["ok"], "video_speed should fail for missing file"
+    r = video_crop("/tmp/nonexistent.mp4", "/tmp/out.mp4")
+    assert not r["ok"], "video_crop should fail for missing file"
+    r = video_to_gif("/tmp/nonexistent.mp4", "/tmp/out.gif")
+    assert not r["ok"], "video_to_gif should fail for missing file"
+    r = video_color_grade("/tmp/nonexistent.mp4", "/tmp/out.mp4", brightness=0.5)
+    assert not r["ok"], "video_color_grade should fail for missing file"
+    r = video_remove_audio("/tmp/nonexistent.mp4", "/tmp/out.mp4")
+    assert not r["ok"], "video_remove_audio should fail for missing file"
+    print(f"    New video tools handle missing files: OK")
+    return True
+
+test("Editor: new video tools", test_editor_new_video_tools)
+
+async def test_editor_run_method():
+    from agents.editor_agent import EditorAgent
+    agent = EditorAgent(config={"media_dir": "/tmp/media"})
+    # Test run() method exists and accepts tasks
+    r = await agent.run("trim video", {"input": "/tmp/test.mp4", "start": 0, "end": 5})
+    assert "ok" in r or "error" in r, "run() should return result"
+    print(f"    Editor run() method works: OK")
+    return True
+
+test("Editor: run method", test_editor_run_method)
 
 section("16. GDRIVE MEDIA TOOLS")
 

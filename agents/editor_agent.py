@@ -1,14 +1,16 @@
 """
 Editor Agent — video editing, image generation, stock media, media processing.
-Integrates FFmpeg, MoviePy, Pillow, Pexels API, and Google Flow MCP.
+Integrates FFmpeg, MoviePy, Pillow, Pexels API, Edge TTS, Google Drive, Pinterest.
 """
 
 import os
+import re
 from agents.base_agent import BaseAgent
 from core.tools.media_tools import (
     video_probe, video_trim, video_concat, video_overlay,
     video_add_audio, video_add_text, video_add_subtitles,
     video_from_images, video_export, video_add_transition,
+    video_speed, video_crop, video_to_gif, video_color_grade, video_remove_audio,
     generate_thumbnail, image_resize, image_composite, image_filter,
     audio_extract, audio_trim, audio_normalize,
 )
@@ -22,18 +24,20 @@ from core.tools.image_tools import (
     generate_youtube_thumbnail, generate_quote_image,
     generate_gradient, add_watermark, batch_generate_posters,
 )
-from core.tools.gdrive_tools import GDriveMediaTools, GDRIVE_TOOLS
-from core.tools.pinterest_tools import PinterestTools, PINTEREST_TOOLS
+from core.tools.gdrive_tools import GDriveMediaTools
+from core.tools.pinterest_tools import PinterestTools
 
 
 class EditorAgent(BaseAgent):
     """Video editing, image generation, and media processing agent."""
 
     AGENT_TYPE = "editor"
+    SOUL_FILE = "editor.md"
 
     APPROVAL_REQUIRED = {
         "batch_generate", "video_export", "download_stock_video",
         "gdrive_download_media", "pinterest_download_board",
+        "video_add_voiceover",
     }
 
     def __init__(self, config=None, memory=None, model_router=None,
@@ -48,7 +52,242 @@ class EditorAgent(BaseAgent):
             remote_name=(config or {}).get("gdrive_remote", "gdrive")
         )
         self._pinterest = PinterestTools()
+        self._tts = None
         self._register_tools()
+
+    def _get_tts(self):
+        if self._tts is None:
+            from core.voice.tts import TTS
+            self._tts = TTS()
+        return self._tts
+
+    # ============================================================
+    # RUN — accept natural language tasks from orchestrator
+    # ============================================================
+
+    async def run(self, task: str, context: dict | None = None) -> dict:
+        """Execute editor task via natural language."""
+        task_lower = task.lower()
+        ctx = context or {}
+
+        # Auto-detect intent and route to tools
+        result = None
+
+        # Video editing tasks
+        if any(w in task_lower for w in ["trim", "cut", "potong"]):
+            result = await self._handle_trim_task(task, ctx)
+        elif any(w in task_lower for w in ["concat", "combine", "gabung", "merge"]):
+            result = await self._handle_concat_task(task, ctx)
+        elif any(w in task_lower for w in ["slideshow", "images to video", "gambar jadi video"]):
+            result = await self._handle_slideshow_task(task, ctx)
+        elif any(w in task_lower for w in ["gif", "animate"]):
+            result = await self._handle_gif_task(task, ctx)
+        elif any(w in task_lower for w in ["voiceover", "suara", "narrate", "tts"]):
+            result = await self._handle_voiceover_task(task, ctx)
+        elif any(w in task_lower for w in ["speed", "laju", "perlahan", "slow", "fast"]):
+            result = await self._handle_speed_task(task, ctx)
+        elif any(w in task_lower for w in ["crop", "potong gambar", "resize"]):
+            result = await self._handle_crop_task(task, ctx)
+        elif any(w in task_lower for w in ["color", "warna", "grade", "filter"]):
+            result = await self._handle_color_task(task, ctx)
+        elif any(w in task_lower for w in ["mute", "remove audio", "buang audio"]):
+            result = await self._handle_mute_task(task, ctx)
+        elif any(w in task_lower for w in ["thumbnail", "thumb"]):
+            result = await self._handle_thumbnail_task(task, ctx)
+
+        # Image generation tasks
+        elif any(w in task_lower for w in ["poster", "banner", "flyer"]):
+            result = await self._handle_poster_task(task, ctx)
+        elif any(w in task_lower for w in ["instagram", "social media", "post"]):
+            result = await self._handle_social_task(task, ctx)
+        elif any(w in task_lower for w in ["youtube", "thumbnail"]):
+            result = await self._handle_youtube_task(task, ctx)
+        elif any(w in task_lower for w in ["quote", "kata"]):
+            result = await self._handle_quote_task(task, ctx)
+
+        # Stock media
+        elif any(w in task_lower for w in ["stock", "footage", "pexels"]):
+            result = await self._handle_stock_task(task, ctx)
+
+        # Google Drive
+        elif any(w in task_lower for w in ["gdrive", "google drive", "drive"]):
+            result = await self._handle_gdrive_task(task, ctx)
+
+        # Pinterest
+        elif any(w in task_lower for w in ["pinterest", "pin"]):
+            result = await self._handle_pinterest_task(task, ctx)
+
+        # Probe/inspect
+        elif any(w in task_lower for w in ["probe", "inspect", "info", "metadata"]):
+            result = await self._handle_probe_task(task, ctx)
+
+        if result:
+            if self.memory:
+                self.memory.store(
+                    f"Editor completed: {task[:80]}",
+                    source="agent", agent="editor",
+                )
+            return result
+
+        # Fallback: use LLM to understand and suggest
+        response = await self.think(
+            f"Editor task: {task}\n\nAvailable capabilities: "
+            "video trim/concat/crop/speed/gif, image generation (poster/banner/social), "
+            "stock media search, Google Drive, Pinterest, TTS voiceover. "
+            "Respond with which tool to use and parameters.",
+            context=f"Available tools: {list(self.tools.keys())}"
+        )
+        return {"agent": "editor", "text": response, "status": "ok"}
+
+    # ---- Task Handlers ----
+
+    async def _handle_trim_task(self, task: str, ctx: dict) -> dict:
+        input_path = ctx.get("input") or ctx.get("video")
+        if not input_path:
+            return {"ok": False, "error": "perlu input video path"}
+        start = ctx.get("start", 0)
+        end = ctx.get("end", 10)
+        output = ctx.get("output")
+        return await self._video_trim(input_path, start, end, output)
+
+    async def _handle_concat_task(self, task: str, ctx: dict) -> dict:
+        inputs = ctx.get("inputs") or ctx.get("videos")
+        if not inputs:
+            return {"ok": False, "error": "perlu list video paths"}
+        return await self._video_concat(inputs, ctx.get("output"))
+
+    async def _handle_slideshow_task(self, task: str, ctx: dict) -> dict:
+        images = ctx.get("images")
+        if not images:
+            return {"ok": False, "error": "perlu list image paths"}
+        return await self._video_from_images(images, ctx.get("output"),
+            seconds_per_image=ctx.get("seconds_per_image", 3.0))
+
+    async def _handle_gif_task(self, task: str, ctx: dict) -> dict:
+        input_path = ctx.get("input") or ctx.get("video")
+        if not input_path:
+            return {"ok": False, "error": "perlu input video path"}
+        from core.tools.media_tools import video_to_gif
+        output = ctx.get("output", os.path.join(self.media_dir, "gif",
+            f"{os.path.splitext(os.path.basename(input_path))[0]}.gif"))
+        os.makedirs(os.path.dirname(output), exist_ok=True)
+        return video_to_gif(input_path, output,
+            start=ctx.get("start", 0), duration=ctx.get("duration", 5.0),
+            fps=ctx.get("fps", 15))
+
+    async def _handle_voiceover_task(self, task: str, ctx: dict) -> dict:
+        text = ctx.get("text") or ctx.get("narration")
+        video = ctx.get("input") or ctx.get("video")
+        if not text:
+            return {"ok": False, "error": "perlu text untuk voiceover"}
+        return await self._video_add_voiceover(video, text,
+            voice=ctx.get("voice", "yasmin"),
+            output=ctx.get("output"))
+
+    async def _handle_speed_task(self, task: str, ctx: dict) -> dict:
+        input_path = ctx.get("input") or ctx.get("video")
+        if not input_path:
+            return {"ok": False, "error": "perlu input video path"}
+        # Parse speed from task
+        speed = ctx.get("speed", 1.0)
+        if "2x" in task or "double" in task or "laju" in task:
+            speed = 2.0
+        elif "half" in task or "perlahan" in task or "slow" in task:
+            speed = 0.5
+        elif "0.5x" in task:
+            speed = 0.5
+        return await self._video_speed(input_path, speed, ctx.get("output"))
+
+    async def _handle_crop_task(self, task: str, ctx: dict) -> dict:
+        input_path = ctx.get("input") or ctx.get("video") or ctx.get("image")
+        if not input_path:
+            return {"ok": False, "error": "perlu input path"}
+        return await self._video_crop(input_path, ctx.get("output"),
+            x=ctx.get("x", 0), y=ctx.get("y", 0),
+            width=ctx.get("width"), height=ctx.get("height"))
+
+    async def _handle_color_task(self, task: str, ctx: dict) -> dict:
+        input_path = ctx.get("input") or ctx.get("video")
+        if not input_path:
+            return {"ok": False, "error": "perlu input video path"}
+        return await self._video_color_grade(input_path, ctx.get("output"),
+            brightness=ctx.get("brightness", 0.0),
+            contrast=ctx.get("contrast", 1.0),
+            saturation=ctx.get("saturation", 1.0),
+            gamma=ctx.get("gamma", 1.0))
+
+    async def _handle_mute_task(self, task: str, ctx: dict) -> dict:
+        input_path = ctx.get("input") or ctx.get("video")
+        if not input_path:
+            return {"ok": False, "error": "perlu input video path"}
+        return await self._video_remove_audio(input_path, ctx.get("output"))
+
+    async def _handle_thumbnail_task(self, task: str, ctx: dict) -> dict:
+        input_path = ctx.get("input") or ctx.get("video")
+        if not input_path:
+            return {"ok": False, "error": "perlu input video path"}
+        return await self._generate_thumbnail(input_path, ctx.get("output"),
+            time=ctx.get("time", 1.0))
+
+    async def _handle_poster_task(self, task: str, ctx: dict) -> dict:
+        title = ctx.get("title") or task
+        return await self._generate_poster(title,
+            subtitle=ctx.get("subtitle", ""),
+            output_path=ctx.get("output"),
+            bg_color=ctx.get("color", "#1a1a2e"))
+
+    async def _handle_social_task(self, task: str, ctx: dict) -> dict:
+        text = ctx.get("text") or task
+        return await self._generate_instagram_post(text,
+            output_path=ctx.get("output"),
+            bg_color=ctx.get("color", "#4a4e69"))
+
+    async def _handle_youtube_task(self, task: str, ctx: dict) -> dict:
+        title = ctx.get("title") or task
+        return await self._generate_youtube_thumbnail(title,
+            output_path=ctx.get("output"),
+            bg_image=ctx.get("bg_image"))
+
+    async def _handle_quote_task(self, task: str, ctx: dict) -> dict:
+        quote = ctx.get("quote") or task
+        return await self._generate_quote_image(quote,
+            author=ctx.get("author", ""),
+            output_path=ctx.get("output"))
+
+    async def _handle_stock_task(self, task: str, ctx: dict) -> dict:
+        query = ctx.get("query") or task
+        media_type = ctx.get("type", "image")
+        if media_type == "video":
+            return await self._search_stock_video(query,
+                per_page=ctx.get("limit", 10))
+        return await self._search_stock_image(query,
+            per_page=ctx.get("limit", 10))
+
+    async def _handle_gdrive_task(self, task: str, ctx: dict) -> dict:
+        action = ctx.get("action", "browse")
+        if action == "search":
+            return await self._gdrive_search_media(ctx.get("query", ""),
+                folder=ctx.get("folder", ""))
+        elif action == "download":
+            return await self._gdrive_download_media(ctx.get("remote_path", ""))
+        elif action == "storage":
+            return await self._gdrive_get_storage_info()
+        return await self._gdrive_browse_folder(ctx.get("path", ""))
+
+    async def _handle_pinterest_task(self, task: str, ctx: dict) -> dict:
+        query = ctx.get("query") or task
+        return await self._pinterest_search(query,
+            limit=ctx.get("limit", 20))
+
+    async def _handle_probe_task(self, task: str, ctx: dict) -> dict:
+        path = ctx.get("input") or ctx.get("path")
+        if not path:
+            return {"ok": False, "error": "perlu file path"}
+        return await self._video_probe(path)
+
+    # ============================================================
+    # TOOLS REGISTRATION
+    # ============================================================
 
     def _register_tools(self):
         # Video tools
@@ -62,6 +301,12 @@ class EditorAgent(BaseAgent):
         self.register_tool("video_from_images", self._video_from_images)
         self.register_tool("video_export", self._video_export)
         self.register_tool("video_add_transition", self._video_add_transition)
+        self.register_tool("video_speed", self._video_speed)
+        self.register_tool("video_crop", self._video_crop)
+        self.register_tool("video_to_gif", self._video_to_gif)
+        self.register_tool("video_color_grade", self._video_color_grade)
+        self.register_tool("video_remove_audio", self._video_remove_audio)
+        self.register_tool("video_add_voiceover", self._video_add_voiceover)
 
         # Image tools
         self.register_tool("image_resize", self._image_resize)
@@ -79,6 +324,8 @@ class EditorAgent(BaseAgent):
         self.register_tool("search_stock_video", self._search_stock_video)
         self.register_tool("download_stock_image", self._download_stock_image)
         self.register_tool("download_stock_video", self._download_stock_video)
+        self.register_tool("get_curated_photos", self._get_curated_photos)
+        self.register_tool("get_popular_videos", self._get_popular_videos)
 
         # Image generation tools
         self.register_tool("generate_poster", self._generate_poster)
@@ -188,6 +435,93 @@ class EditorAgent(BaseAgent):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         return video_add_transition(input_path, output_path, transition_type)
 
+    async def _video_speed(self, input_path: str, speed: float = 1.0,
+                           output_path: str = None) -> dict:
+        if not output_path:
+            output_path = os.path.join(self.media_dir, "speed",
+                f"speed{speed}x_{os.path.basename(input_path)}")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        return video_speed(input_path, output_path, speed)
+
+    async def _video_crop(self, input_path: str, output_path: str = None,
+                          x: int = 0, y: int = 0,
+                          width: int = None, height: int = None) -> dict:
+        if not output_path:
+            output_path = os.path.join(self.media_dir, "cropped",
+                f"crop_{os.path.basename(input_path)}")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        return video_crop(input_path, output_path, x, y, width, height)
+
+    async def _video_to_gif(self, input_path: str, output_path: str = None,
+                            start: float = 0, duration: float = 5.0,
+                            fps: int = 15) -> dict:
+        if not output_path:
+            output_path = os.path.join(self.media_dir, "gif",
+                f"{os.path.splitext(os.path.basename(input_path))[0]}.gif")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        return video_to_gif(input_path, output_path, start, duration, fps)
+
+    async def _video_color_grade(self, input_path: str, output_path: str = None,
+                                 brightness: float = 0.0, contrast: float = 1.0,
+                                 saturation: float = 1.0, gamma: float = 1.0,
+                                 temperature: float = 0.0) -> dict:
+        if not output_path:
+            output_path = os.path.join(self.media_dir, "graded",
+                f"graded_{os.path.basename(input_path)}")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        return video_color_grade(input_path, output_path, brightness,
+            contrast, saturation, gamma, temperature)
+
+    async def _video_remove_audio(self, input_path: str,
+                                  output_path: str = None) -> dict:
+        if not output_path:
+            output_path = os.path.join(self.media_dir, "muted",
+                f"muted_{os.path.basename(input_path)}")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        return video_remove_audio(input_path, output_path)
+
+    async def _video_add_voiceover(self, video_path: str = None,
+                                   text: str = "", voice: str = "yasmin",
+                                   output_path: str = None) -> dict:
+        """Generate TTS audio and overlay on video."""
+        tts = self._get_tts()
+        tts_result = await tts.synthesize_async(text, voice_name=voice)
+        if not tts_result.get("audio"):
+            return {"ok": False, "error": tts_result.get("error", "TTS failed")}
+
+        # Save TTS audio to temp file
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            f.write(tts_result["audio"])
+            audio_path = f.name
+
+        try:
+            if video_path and os.path.exists(video_path):
+                # Overlay TTS on video
+                if not output_path:
+                    output_path = os.path.join(self.media_dir, "voiceover",
+                        f"vo_{os.path.basename(video_path)}")
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                result = video_add_audio(video_path, audio_path, output_path, replace=True)
+            else:
+                # Just return the TTS audio file
+                if not output_path:
+                    output_path = os.path.join(self.media_dir, "voiceover",
+                        f"tts_{hash(text) % 100000}.mp3")
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                import shutil
+                shutil.copy(audio_path, output_path)
+                result = {"ok": True, "output": output_path}
+        finally:
+            try:
+                os.unlink(audio_path)
+            except Exception:
+                pass
+
+        result["engine"] = tts_result.get("engine", "edge-neural")
+        result["voice"] = tts_result.get("voice", voice)
+        return result
+
     # ---- Image Tools ----
 
     async def _image_resize(self, input_path: str, output_path: str = None,
@@ -266,6 +600,12 @@ class EditorAgent(BaseAgent):
                                     filename: str = None) -> dict:
         return download_stock_video(url, output_dir, filename)
 
+    async def _get_curated_photos(self, per_page: int = 10) -> dict:
+        return get_curated_photos(per_page=per_page, config=self.config)
+
+    async def _get_popular_videos(self, per_page: int = 10) -> dict:
+        return get_popular_videos(per_page=per_page, config=self.config)
+
     # ---- Image Generation Tools ----
 
     async def _generate_poster(self, title: str, subtitle: str = "",
@@ -306,7 +646,7 @@ class EditorAgent(BaseAgent):
         return add_watermark(input_path, output_path, text, position)
 
     async def _batch_generate_posters(self, items: list,
-                                       output_dir: str = None) -> dict:
+                                      output_dir: str = None) -> dict:
         return batch_generate_posters(items, output_dir)
 
     # ---- Google Drive Tools ----
@@ -374,4 +714,5 @@ class EditorAgent(BaseAgent):
             "exists": os.path.exists(media_dir),
             "total_files": total_files,
             "total_size_mb": round(total_size / (1024 * 1024), 1),
+            "tts": self._get_tts().status(),
         }

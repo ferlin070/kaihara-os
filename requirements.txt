@@ -30,11 +30,18 @@ mcp>=1.1.0
 # --- Web / Scraping ---
 playwright>=1.49.0
 beautifulsoup4>=4.12.0
-httpx>=0.28.0
+
+# --- Media / Image Processing ---
+Pillow>=10.0.0           # Image generation, resize, filter, composite
+MoviePy>=2.0.0           # Video slideshow with transitions
+edge-tts>=6.1.0          # Microsoft Edge Neural TTS (BM voices)
+
+# --- Stock Media ---
+# httpx already included above
 
 # --- Voice (optional) ---
 # openai-whisper>=20240930  # uncomment when enabling voice
-# TTS  # Piper Python bindings
+# piper-tts                # local TTS fallback
 
 # --- Channels ---
 python-telegram-bot>=21.6

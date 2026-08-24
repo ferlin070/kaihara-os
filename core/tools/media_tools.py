@@ -477,3 +477,148 @@ def audio_normalize(input_path: str, output_path: str, target_db: float = -16.0)
     if r.get("ok") and os.path.exists(output_path):
         return {"ok": True, "output": output_path}
     return {"ok": False, "error": r.get("stderr", "normalize failed")}
+
+
+# ============================================================
+# Video Speed
+# ============================================================
+
+def video_speed(input_path: str, output_path: str, speed: float = 1.0) -> dict:
+    """Change video speed. speed=2.0 = 2x faster, speed=0.5 = half speed."""
+    if speed <= 0:
+        return {"ok": False, "error": "speed must be > 0"}
+    pts = 1.0 / speed
+    args = [
+        "-i", input_path,
+        "-vf", f"setpts={pts}*PTS",
+        "-af", f"atempo={min(max(speed, 0.5), 2.0)}",
+        output_path
+    ]
+    r = _run_ffmpeg(args)
+    if r.get("ok") and os.path.exists(output_path):
+        probe = video_probe(output_path)
+        return {"ok": True, "output": output_path, "duration": probe.get("duration", 0)}
+    return {"ok": False, "error": r.get("stderr", "speed change failed")}
+
+
+# ============================================================
+# Video Crop
+# ============================================================
+
+def video_crop(input_path: str, output_path: str,
+               x: int = 0, y: int = 0, width: int = None, height: int = None) -> dict:
+    """Crop video to region. If width/height not set, crops to center square."""
+    probe = video_probe(input_path)
+    if not probe.get("ok"):
+        return {"ok": False, "error": "cannot probe video"}
+    vw = probe.get("video", {}).get("width", 1920)
+    vh = probe.get("video", {}).get("height", 1080)
+    if not width and not height:
+        side = min(vw, vh)
+        width = side
+        height = side
+        x = (vw - side) // 2
+        y = (vh - side) // 2
+    elif not width:
+        width = vw
+    elif not height:
+        height = vh
+
+    args = [
+        "-i", input_path,
+        "-vf", f"crop={width}:{height}:{x}:{y}",
+        "-c:a", "copy", output_path
+    ]
+    r = _run_ffmpeg(args)
+    if r.get("ok") and os.path.exists(output_path):
+        return {"ok": True, "output": output_path, "size": [width, height]}
+    return {"ok": False, "error": r.get("stderr", "crop failed")}
+
+
+# ============================================================
+# Video to GIF
+# ============================================================
+
+def video_to_gif(input_path: str, output_path: str,
+                 start: float = 0, duration: float = 5.0, fps: int = 15) -> dict:
+    """Convert video segment to GIF."""
+    palette_path = os.path.join(tempfile.gettempdir(), "palette.png")
+    # Generate palette for better quality
+    _run_ffmpeg([
+        "-ss", str(start), "-t", str(duration), "-i", input_path,
+        "-vf", f"fps={fps},palettegen=stats_mode=diff",
+        "-y", palette_path
+    ])
+    # Generate GIF with palette
+    args = [
+        "-ss", str(start), "-t", str(duration), "-i", input_path,
+        "-i", palette_path,
+        "-lavfi", f"fps={fps} [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=5",
+        output_path
+    ]
+    r = _run_ffmpeg(args)
+    try:
+        os.remove(palette_path)
+    except Exception:
+        pass
+    if r.get("ok") and os.path.exists(output_path):
+        size_kb = os.path.getsize(output_path) / 1024
+        return {"ok": True, "output": output_path, "size_kb": round(size_kb, 1)}
+    return {"ok": False, "error": r.get("stderr", "gif conversion failed")}
+
+
+# ============================================================
+# Video Color Grade
+# ============================================================
+
+def video_color_grade(input_path: str, output_path: str,
+                      brightness: float = 0.0, contrast: float = 1.0,
+                      saturation: float = 1.0, gamma: float = 1.0,
+                      temperature: float = 0.0) -> dict:
+    """Color grade video. brightness: -1.0 to 1.0, contrast/saturation: 0.0 to 3.0,
+    gamma: 0.1 to 10.0, temperature: -1.0 (cool) to 1.0 (warm)."""
+    filters = []
+    if brightness != 0.0:
+        filters.append(f"eq=brightness={brightness}")
+    if contrast != 1.0:
+        filters.append(f"eq=contrast={contrast}")
+    if saturation != 1.0:
+        filters.append(f"eq=saturation={saturation}")
+    if gamma != 1.0:
+        filters.append(f"eq=gamma={gamma}")
+    if temperature != 0.0:
+        # Colorbalance for temperature
+        rs = max(-1, min(1, temperature * 0.3))
+        gs = 0
+        bs = max(-1, min(1, -temperature * 0.3))
+        filters.append(f"colorbalance=rs={rs}:gs={gs}:bs={bs}")
+
+    if not filters:
+        return {"ok": False, "error": "no color adjustments specified"}
+
+    vf = ",".join(filters)
+    args = [
+        "-i", input_path,
+        "-vf", vf,
+        "-c:a", "copy", output_path
+    ]
+    r = _run_ffmpeg(args)
+    if r.get("ok") and os.path.exists(output_path):
+        return {"ok": True, "output": output_path}
+    return {"ok": False, "error": r.get("stderr", "color grade failed")}
+
+
+# ============================================================
+# Video Remove Audio
+# ============================================================
+
+def video_remove_audio(input_path: str, output_path: str) -> dict:
+    """Remove audio track from video (mute)."""
+    args = [
+        "-i", input_path,
+        "-an", "-c:v", "copy", output_path
+    ]
+    r = _run_ffmpeg(args)
+    if r.get("ok") and os.path.exists(output_path):
+        return {"ok": True, "output": output_path}
+    return {"ok": False, "error": r.get("stderr", "remove audio failed")}
