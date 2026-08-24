@@ -202,15 +202,15 @@ export default function DaemonView() {
         <div className="hud-panel">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-bold text-kaihara-muted uppercase">Alerts</h3>
-            <span className={`text-xs ${alerts.length > 0 ? 'text-kaihara-danger' : 'text-kaihara-success'}`}>
-              {alerts.length} active
+            <span className={`text-xs ${(alerts || []).length > 0 ? 'text-kaihara-danger' : 'text-kaihara-success'}`}>
+              {(alerts || []).length} active
             </span>
           </div>
           <div className="space-y-1.5 max-h-32 overflow-y-auto">
-            {alerts.length === 0 ? (
+            {(alerts || []).length === 0 ? (
               <p className="text-xs text-kaihara-muted">No active alerts.</p>
             ) : (
-              alerts.map((alert, i) => (
+              (alerts || []).map((alert, i) => (
                 <div key={i} className="flex items-start gap-2 text-xs">
                   <span className={alert.severity === 'critical' ? 'text-kaihara-danger' : 'text-kaihara-warning'}>!</span>
                   <div>
@@ -228,7 +228,7 @@ export default function DaemonView() {
       <div className="hud-panel">
         <h3 className="text-xs font-bold text-kaihara-muted uppercase mb-3">Services</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {status.services.map((service) => (
+          {(status.services || []).map((service: any) => (
             <ServiceCard
               key={service.name}
               service={service}
@@ -240,11 +240,11 @@ export default function DaemonView() {
       </div>
 
       {/* Restart History */}
-      {status.restart_history.length > 0 && (
+      {(status.restart_history || []).length > 0 && (
         <div className="hud-panel">
           <h3 className="text-xs font-bold text-kaihara-muted uppercase mb-3">Restart History</h3>
           <div className="space-y-1 max-h-40 overflow-y-auto">
-            {status.restart_history.slice().reverse().slice(0, 10).map((entry, i) => (
+            {(status.restart_history || []).slice().reverse().slice(0, 10).map((entry, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className="text-kaihara-muted font-mono">{entry.time?.slice(11, 19)}</span>
                 <span className="text-kaihara-accent">{entry.agent}</span>

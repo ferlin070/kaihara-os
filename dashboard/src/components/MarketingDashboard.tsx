@@ -175,7 +175,7 @@ function LeadsTab() {
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 px-4 py-3 border-b border-kaihara-border">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-bold uppercase tracking-wide">Leads ({leads.length})</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wide">Leads ({(leads || []).length})</h2>
           <button onClick={() => setShowForm(!showForm)} className="px-3 py-1 text-xs bg-kaihara-accent text-white rounded">+ New</button>
         </div>
         <div className="flex gap-2">
@@ -207,7 +207,7 @@ function LeadsTab() {
       )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {leads.map(lead => (
+        {(leads || []).map(lead => (
           <div key={lead.id} className="hud-panel hover:border-kaihara-accent/50 transition-colors">
             <div className="flex items-center justify-between mb-1">
               <div>
@@ -232,7 +232,7 @@ function LeadsTab() {
             </div>
           </div>
         ))}
-        {leads.length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No leads found.</p>}
+        {(leads || []).length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No leads found.</p>}
       </div>
     </div>
   )
@@ -275,7 +275,7 @@ function ClientsTab() {
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 px-4 py-3 border-b border-kaihara-border">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-bold uppercase tracking-wide">Clients ({clients.length})</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wide">Clients ({(clients || []).length})</h2>
           <button onClick={() => setShowForm(!showForm)} className="px-3 py-1 text-xs bg-kaihara-accent text-white rounded">+ New</button>
         </div>
         <div className="flex gap-2">
@@ -306,7 +306,7 @@ function ClientsTab() {
       )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {clients.map(client => (
+        {(clients || []).map(client => (
           <div key={client.id} className="hud-panel hover:border-kaihara-accent/50 transition-colors">
             <div className="flex items-center justify-between mb-1">
               <div>
@@ -332,7 +332,7 @@ function ClientsTab() {
             </div>
           </div>
         ))}
-        {clients.length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No clients found.</p>}
+        {(clients || []).length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No clients found.</p>}
       </div>
     </div>
   )
@@ -366,7 +366,7 @@ function CampaignsTab() {
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 px-4 py-3 border-b border-kaihara-border">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wide">Campaigns ({campaigns.length})</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wide">Campaigns ({(campaigns || []).length})</h2>
           <button onClick={() => setShowForm(!showForm)} className="px-3 py-1 text-xs bg-kaihara-accent text-white rounded">+ New</button>
         </div>
       </div>
@@ -386,7 +386,7 @@ function CampaignsTab() {
       )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {campaigns.map(c => (
+        {(campaigns || []).map(c => (
           <div key={c.id} className="hud-panel">
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-medium">{c.name}</span>
@@ -401,7 +401,7 @@ function CampaignsTab() {
             <button onClick={() => deleteCampaign(c.id).then(fetch)} className="text-xs px-2 py-0.5 bg-kaihara-danger/20 text-kaihara-danger rounded mt-2">Delete</button>
           </div>
         ))}
-        {campaigns.length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No campaigns yet.</p>}
+        {(campaigns || []).length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No campaigns yet.</p>}
       </div>
     </div>
   )
@@ -455,7 +455,7 @@ function ContentTab() {
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 px-4 py-3 border-b border-kaihara-border">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wide">Content ({content.length})</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wide">Content ({(content || []).length})</h2>
           <div className="flex gap-2">
             <button onClick={handleGenerate} disabled={generating}
               className="px-3 py-1 text-xs bg-kaihara-warning/20 text-kaihara-warning rounded disabled:opacity-50">
@@ -488,7 +488,7 @@ function ContentTab() {
       )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {content.map(c => (
+        {(content || []).map(c => (
           <div key={c.id} className="hud-panel">
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-medium">{c.title}</span>
@@ -505,7 +505,7 @@ function ContentTab() {
             </div>
           </div>
         ))}
-        {content.length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No content yet. Click AI Generate to create!</p>}
+        {(content || []).length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No content yet. Click AI Generate to create!</p>}
       </div>
     </div>
   )
@@ -559,16 +559,16 @@ function SeoTab() {
             </div>
             {auditResult.issues?.length > 0 && (
               <div>
-                <h4 className="text-xs font-bold text-kaihara-danger mb-1">Issues ({auditResult.issues.length})</h4>
-                {auditResult.issues.map((issue: string, i: number) => (
+                <h4 className="text-xs font-bold text-kaihara-danger mb-1">Issues ({(auditResult.issues || []).length})</h4>
+                {(auditResult.issues || []).map((issue: string, i: number) => (
                   <div key={i} className="text-xs text-kaihara-danger/80 ml-2">• {issue}</div>
                 ))}
               </div>
             )}
             {auditResult.checks?.length > 0 && (
               <div>
-                <h4 className="text-xs font-bold text-kaihara-success mb-1">Passed ({auditResult.checks.length})</h4>
-                {auditResult.checks.map((check: string, i: number) => (
+                <h4 className="text-xs font-bold text-kaihara-success mb-1">Passed ({(auditResult.checks || []).length})</h4>
+                {(auditResult.checks || []).map((check: string, i: number) => (
                   <div key={i} className="text-xs text-kaihara-success/80 ml-2">✓ {check}</div>
                 ))}
               </div>
@@ -580,9 +580,9 @@ function SeoTab() {
 
       {/* Tracked Keywords */}
       <div className="hud-panel">
-        <h3 className="text-xs font-bold text-kaihara-muted uppercase mb-2">Tracked Keywords ({tracking.length})</h3>
+        <h3 className="text-xs font-bold text-kaihara-muted uppercase mb-2">Tracked Keywords ({(tracking || []).length})</h3>
         <div className="space-y-1">
-          {tracking.map((t: any) => (
+          {(tracking || []).map((t: any) => (
             <div key={t.id} className="flex items-center justify-between text-xs">
               <span className="text-kaihara-text">{t.keyword || t.url}</span>
               <div className="flex gap-3">
@@ -591,7 +591,7 @@ function SeoTab() {
               </div>
             </div>
           ))}
-          {tracking.length === 0 && <p className="text-xs text-kaihara-muted">No keywords tracked yet.</p>}
+          {(tracking || []).length === 0 && <p className="text-xs text-kaihara-muted">No keywords tracked yet.</p>}
         </div>
       </div>
     </div>
@@ -633,7 +633,7 @@ function InvoicesTab() {
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 px-4 py-3 border-b border-kaihara-border">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wide">Invoices ({invoices.length})</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wide">Invoices ({(invoices || []).length})</h2>
           <button onClick={() => setShowForm(!showForm)} className="px-3 py-1 text-xs bg-kaihara-accent text-white rounded">+ New</button>
         </div>
       </div>
@@ -653,7 +653,7 @@ function InvoicesTab() {
       )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {invoices.map(inv => (
+        {(invoices || []).map(inv => (
           <div key={inv.id} className="hud-panel">
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-mono text-kaihara-accent">{inv.invoice_number}</span>
@@ -671,7 +671,7 @@ function InvoicesTab() {
             </div>
           </div>
         ))}
-        {invoices.length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No invoices yet.</p>}
+        {(invoices || []).length === 0 && <p className="text-center text-kaihara-muted text-sm py-8">No invoices yet.</p>}
       </div>
     </div>
   )

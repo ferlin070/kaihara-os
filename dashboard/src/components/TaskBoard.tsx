@@ -84,12 +84,12 @@ export default function TaskBoard() {
   }
 
   const selectAll = (status: string) => {
-    const ids = tasks.filter(t => t.status === status).map(t => t.id)
+    const ids = (tasks || []).filter(t => t.status === status).map(t => t.id)
     setSelected(new Set(ids))
   }
 
   const exportTasks = () => {
-    const md = tasks.map(t =>
+    const md = (tasks || []).map(t =>
       `- [${t.status === 'done' ? 'x' : ' '}] **${t.title}** (${t.phase}) — ${t.complexity}${t.assigned_agent ? ` → ${t.assigned_agent}` : ''}`
     ).join('\n')
     const blob = new Blob([md], { type: 'text/markdown' })
@@ -99,7 +99,7 @@ export default function TaskBoard() {
     URL.revokeObjectURL(url)
   }
 
-  const phases = [...new Set(tasks.map(t => t.phase))]
+  const phases = [...new Set((tasks || []).map(t => t.phase))]
 
   return (
     <div className="flex-1 flex flex-col">
@@ -172,7 +172,7 @@ export default function TaskBoard() {
 
       {/* Kanban board */}
       <div className="flex-1 overflow-x-auto p-4">
-        {tasks.length === 0 ? (
+        {(tasks || []).length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <p className="text-kaihara-muted text-sm mb-2">No tasks yet.</p>
@@ -182,7 +182,7 @@ export default function TaskBoard() {
         ) : (
           <div className="grid grid-cols-4 gap-3 h-full">
             {columns.map(col => {
-              const colTasks = tasks.filter(t => t.status === col.key)
+              const colTasks = (tasks || []).filter(t => t.status === col.key)
               return (
                 <div key={col.key} className={`bg-kaihara-surface border-t-2 ${col.color} rounded-lg p-3 overflow-y-auto`}>
                   <div className="flex items-center justify-between mb-3">

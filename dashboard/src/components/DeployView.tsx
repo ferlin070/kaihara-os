@@ -37,10 +37,11 @@ export default function DeployView() {
         getDeployHistory().catch(() => ({ history: [] })),
       ])
       setStatus(s)
-      setContainers(d.containers)
+      setContainers(Array.isArray(d.containers) ? d.containers : [])
       setGitInfo(g)
-      setLxc(l.containers)
-      setHistory(h.history)
+      setLxc(Array.isArray(l.containers) ? l.containers
+             : Array.isArray(l.guests?.containers) ? l.guests.containers : [])
+      setHistory(Array.isArray(h.history) ? h.history : [])
     } catch (e) { addLog(`Error: ${e}`) }
     setLoading(false)
   }, [])
@@ -124,18 +125,18 @@ export default function DeployView() {
       {/* Docker Containers */}
       <div className="hud-panel">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-[10px] text-kaihara-muted">DOCKER CONTAINERS ({containers.length})</h4>
+          <h4 className="text-[10px] text-kaihara-muted">DOCKER CONTAINERS ({(containers || []).length})</h4>
           <div className="flex gap-1">
             <button onClick={() => handleDockerAction('ps')} className="kaihara-btn text-[10px] px-2 py-0.5">Refresh</button>
             <button onClick={() => handleDockerAction('restart')} className="kaihara-btn text-[10px] px-2 py-0.5">Restart All</button>
             <button onClick={() => handleDockerAction('down')} className="kaihara-btn text-[10px] px-2 py-0.5 text-kaihara-danger">Stop All</button>
           </div>
         </div>
-        {containers.length === 0 ? (
+        {(containers || []).length === 0 ? (
           <div className="text-[10px] text-kaihara-muted">No containers found</div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-            {containers.map((c) => (
+            {(containers || []).map((c: any) => (
               <div key={c.ID} className="bg-kaihara-bg/50 border border-kaihara-border rounded p-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-kaihara-text font-mono truncate">{c.Names}</span>
@@ -168,8 +169,8 @@ export default function DeployView() {
 
       {/* Proxmox LXC */}
       <div className="hud-panel">
-        <h4 className="text-[10px] text-kaihara-muted mb-2">PROXMOX LXC ({lxc.length})</h4>
-        {lxc.length === 0 ? (
+        <h4 className="text-[10px] text-kaihara-muted mb-2">PROXMOX LXC ({(lxc || []).length})</h4>
+        {(lxc || []).length === 0 ? (
           <div className="text-[10px] text-kaihara-muted">No LXC containers</div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
