@@ -2237,4 +2237,61 @@ Format as JSON with keys: title, body, hashtags, cta"""
             return {"error": "editor agent not ready"}
         return await editor._google_flow_status()
 
+    # ============================================================
+    # VIDEO PIPELINE — automated workflows
+    # ============================================================
+
+    @app.post("/api/pipeline/voiceover")
+    async def pipeline_voiceover(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pipeline_auto_voiceover(
+            payload.get("video_path", ""),
+            payload.get("text", ""),
+            voice=payload.get("voice", "yasmin"),
+        )
+
+    @app.post("/api/pipeline/slideshow")
+    async def pipeline_slideshow(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pipeline_auto_slideshow(
+            payload.get("image_dir", ""),
+            seconds_per_image=payload.get("seconds_per_image", 3.0),
+            transition=payload.get("transition", "fade"),
+            voiceover=payload.get("voiceover", ""),
+            voice=payload.get("voice", "yasmin"),
+        )
+
+    @app.post("/api/pipeline/thumbnail-grid")
+    async def pipeline_thumbnail_grid(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pipeline_auto_thumbnail_grid(
+            payload.get("video_path", ""),
+            count=payload.get("count", 6),
+        )
+
+    @app.post("/api/pipeline/trim-silence")
+    async def pipeline_trim_silence(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pipeline_auto_trim_silence(
+            payload.get("video_path", ""),
+            threshold=payload.get("threshold", 0.02),
+        )
+
+    @app.post("/api/pipeline/export-all")
+    async def pipeline_export_all(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._pipeline_auto_export_all(
+            payload.get("video_path", ""),
+        )
+
     return app

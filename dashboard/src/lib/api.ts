@@ -1378,6 +1378,53 @@ export async function flowStatus(): Promise<any> {
 }
 
 // ============================================================
+// Video Pipeline
+// ============================================================
+
+export async function pipelineVoiceover(videoPath: string, text: string, voice = 'yasmin'): Promise<any> {
+  const res = await fetch(`${API_BASE}/pipeline/voiceover`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ video_path: videoPath, text, voice }),
+  })
+  return res.json()
+}
+
+export async function pipelineSlideshow(imageDir: string, opts: {
+  seconds_per_image?: number; transition?: string;
+  voiceover?: string; voice?: string;
+} = {}): Promise<any> {
+  const res = await fetch(`${API_BASE}/pipeline/slideshow`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_dir: imageDir, ...opts }),
+  })
+  return res.json()
+}
+
+export async function pipelineThumbnailGrid(videoPath: string, count = 6): Promise<any> {
+  const res = await fetch(`${API_BASE}/pipeline/thumbnail-grid`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ video_path: videoPath, count }),
+  })
+  return res.json()
+}
+
+export async function pipelineTrimSilence(videoPath: string, threshold = 0.02): Promise<any> {
+  const res = await fetch(`${API_BASE}/pipeline/trim-silence`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ video_path: videoPath, threshold }),
+  })
+  return res.json()
+}
+
+export async function pipelineExportAll(videoPath: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/pipeline/export-all`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ video_path: videoPath }),
+  })
+  return res.json()
+}
+
+// ============================================================
 // Meta Agent
 // ============================================================
 

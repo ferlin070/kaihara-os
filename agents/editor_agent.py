@@ -28,6 +28,7 @@ from core.tools.gdrive_tools import GDriveMediaTools
 from core.tools.pinterest_tools import PinterestTools
 from core.tools.ai_tools import AIGenerateTools
 from core.tools.google_flow_tools import GoogleFlowTools
+from core.tools.pipeline_tools import VideoPipeline
 
 
 class EditorAgent(BaseAgent):
@@ -58,6 +59,7 @@ class EditorAgent(BaseAgent):
         self._google_flow = GoogleFlowTools(
             api_token=(config or {}).get("useapi_token", "")
         )
+        self._pipeline = VideoPipeline(media_dir=self.media_dir)
         self._tts = None
         self._register_tools()
 
@@ -132,6 +134,18 @@ class EditorAgent(BaseAgent):
         # Google Flow
         elif any(w in task_lower for w in ["google flow", "veo", "imagen", "ai video"]):
             result = await self._handle_google_flow_task(task, ctx)
+
+        # Pipeline automation
+        elif any(w in task_lower for w in ["auto voiceover", "auto suara", "pipeline"]):
+            result = await self._handle_pipeline_task(task, ctx)
+        elif any(w in task_lower for w in ["slideshow", "auto slideshow"]):
+            result = await self._handle_slideshow_pipeline_task(task, ctx)
+        elif any(w in task_lower for w in ["export all", "export multiple", "multi export"]):
+            result = await self._handle_export_all_task(task, ctx)
+        elif any(w in task_lower for w in ["trim silence", "buang senyap"]):
+            result = await self._handle_trim_silence_task(task, ctx)
+        elif any(w in task_lower for w in ["thumbnail grid", "grid thumbnail"]):
+            result = await self._handle_thumbnail_grid_task(task, ctx)
 
         # Probe/inspect
         elif any(w in task_lower for w in ["probe", "inspect", "info", "metadata"]):
@@ -320,6 +334,44 @@ class EditorAgent(BaseAgent):
         return await self._google_flow_generate_image(prompt,
             model=ctx.get("model", "imagen-4"))
 
+    async def _handle_pipeline_task(self, task: str, ctx: dict) -> dict:
+        video = ctx.get("video") or ctx.get("input")
+        text = ctx.get("text") or ctx.get("narration")
+        if not video or not text:
+            return {"ok": False, "error": "perlu video path dan text"}
+        return await self._pipeline_auto_voiceover(video, text,
+            voice=ctx.get("voice", "yasmin"))
+
+    async def _handle_slideshow_pipeline_task(self, task: str, ctx: dict) -> dict:
+        image_dir = ctx.get("image_dir") or ctx.get("images")
+        if not image_dir:
+            return {"ok": False, "error": "perlu image directory"}
+        return await self._pipeline_auto_slideshow(image_dir,
+            seconds_per_image=ctx.get("seconds_per_image", 3.0),
+            transition=ctx.get("transition", "fade"),
+            voiceover=ctx.get("voiceover", ""),
+            voice=ctx.get("voice", "yasmin"))
+
+    async def _handle_export_all_task(self, task: str, ctx: dict) -> dict:
+        video = ctx.get("video") or ctx.get("input")
+        if not video:
+            return {"ok": False, "error": "perlu video path"}
+        return await self._pipeline_auto_export_all(video)
+
+    async def _handle_trim_silence_task(self, task: str, ctx: dict) -> dict:
+        video = ctx.get("video") or ctx.get("input")
+        if not video:
+            return {"ok": False, "error": "perlu video path"}
+        return await self._pipeline_auto_trim_silence(video,
+            threshold=ctx.get("threshold", 0.02))
+
+    async def _handle_thumbnail_grid_task(self, task: str, ctx: dict) -> dict:
+        video = ctx.get("video") or ctx.get("input")
+        if not video:
+            return {"ok": False, "error": "perlu video path"}
+        return await self._pipeline_auto_thumbnail_grid(video,
+            count=ctx.get("count", 6))
+
     async def _handle_probe_task(self, task: str, ctx: dict) -> dict:
         path = ctx.get("input") or ctx.get("path")
         if not path:
@@ -405,6 +457,13 @@ class EditorAgent(BaseAgent):
         self.register_tool("google_flow_generate_video", self._google_flow_generate_video)
         self.register_tool("google_flow_image_to_video", self._google_flow_image_to_video)
         self.register_tool("google_flow_status", self._google_flow_status)
+
+        # Video Pipeline tools
+        self.register_tool("pipeline_auto_voiceover", self._pipeline_auto_voiceover)
+        self.register_tool("pipeline_auto_slideshow", self._pipeline_auto_slideshow)
+        self.register_tool("pipeline_auto_thumbnail_grid", self._pipeline_auto_thumbnail_grid)
+        self.register_tool("pipeline_auto_trim_silence", self._pipeline_auto_trim_silence)
+        self.register_tool("pipeline_auto_export_all", self._pipeline_auto_export_all)
 
     # ---- Video Tools ----
 
@@ -798,6 +857,32 @@ class EditorAgent(BaseAgent):
 
     async def _google_flow_status(self) -> dict:
         return self._google_flow.status()
+
+    # ---- Video Pipeline Tools ----
+
+    async def _pipeline_auto_voiceover(self, video_path: str, text: str,
+                                        voice: str = "yasmin") -> dict:
+        return await self._pipeline.auto_voiceover(video_path, text, voice)
+
+    async def _pipeline_auto_slideshow(self, image_dir: str,
+                                        seconds_per_image: float = 3.0,
+                                        transition: str = "fade",
+                                        voiceover: str = "",
+                                        voice: str = "yasmin") -> dict:
+        return await self._pipeline.auto_slideshow(image_dir,
+            seconds_per_image=seconds_per_image, transition=transition,
+            voiceover=voiceover, voice=voice)
+
+    async def _pipeline_auto_thumbnail_grid(self, video_path: str,
+                                             count: int = 6) -> dict:
+        return await self._pipeline.auto_thumbnail_grid(video_path, count)
+
+    async def _pipeline_auto_trim_silence(self, video_path: str,
+                                           threshold: float = 0.02) -> dict:
+        return await self._pipeline.auto_trim_silence(video_path, threshold)
+
+    async def _pipeline_auto_export_all(self, video_path: str) -> dict:
+        return await self._pipeline.auto_export_all(video_path)
 
     # ---- Background Task ----
 

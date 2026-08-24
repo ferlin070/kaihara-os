@@ -1093,7 +1093,9 @@ async def test_editor_agent():
                 "video_color_grade", "video_remove_audio",
                 "video_add_voiceover", "get_curated_photos", "get_popular_videos",
                 "ai_generate_image", "ai_generate_poster",
-                "google_flow_generate_image", "google_flow_generate_video"]
+                "google_flow_generate_image", "google_flow_generate_video",
+                "pipeline_auto_voiceover", "pipeline_auto_slideshow",
+                "pipeline_auto_export_all", "pipeline_auto_trim_silence"]
     for t in expected:
         assert t in tools, f"Missing tool: {t}"
     print(f"    All expected tools present")
@@ -1172,6 +1174,19 @@ async def test_google_flow_tools():
     return True
 
 test("Google Flow tools init", test_google_flow_tools)
+
+async def test_pipeline_tools():
+    from core.tools.pipeline_tools import VideoPipeline, VIDEO_PIPELINE_TOOLS
+    tools = VideoPipeline()
+    assert len(VIDEO_PIPELINE_TOOLS) == 5, f"Expected 5 tools, got {len(VIDEO_PIPELINE_TOOLS)}"
+    tool_names = [t["name"] for t in VIDEO_PIPELINE_TOOLS]
+    assert "pipeline_auto_voiceover" in tool_names
+    assert "pipeline_auto_slideshow" in tool_names
+    assert "pipeline_auto_export_all" in tool_names
+    print(f"    Pipeline tools: {len(VIDEO_PIPELINE_TOOLS)} — {tool_names}")
+    return True
+
+test("Pipeline tools init", test_pipeline_tools)
 
 section("16. GDRIVE MEDIA TOOLS")
 

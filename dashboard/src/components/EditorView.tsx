@@ -11,9 +11,11 @@ import {
   pinterestClearDownloads,
   aiGenerateImage, aiGeneratePoster, aiGenerateStatus,
   flowGenerateImage, flowGenerateVideo, flowStatus,
+  pipelineVoiceover, pipelineSlideshow, pipelineThumbnailGrid,
+  pipelineTrimSilence, pipelineExportAll,
 } from '../lib/api'
 
-type Tab = 'poster' | 'banner' | 'social' | 'stock' | 'video' | 'probe' | 'gdrive' | 'pinterest' | 'ai_gen' | 'google_flow'
+type Tab = 'poster' | 'banner' | 'social' | 'stock' | 'video' | 'probe' | 'gdrive' | 'pinterest' | 'ai_gen' | 'google_flow' | 'pipeline'
 
 export default function EditorView() {
   const [tab, setTab] = useState<Tab>('poster')
@@ -74,6 +76,13 @@ export default function EditorView() {
   const [flowType, setFlowType] = useState<'image' | 'video'>('image')
   const [flowResult, setFlowResult] = useState<any>(null)
   const [flowStatus, setFlowStatus] = useState<any>(null)
+
+  // Pipeline
+  const [pipeVideoPath, setPipeVideoPath] = useState('')
+  const [pipeVoiceoverText, setPipeVoiceoverText] = useState('')
+  const [pipeVoice, setPipeVoice] = useState('yasmin')
+  const [pipeImageDir, setPipeImageDir] = useState('')
+  const [pipeResult, setPipeResult] = useState<any>(null)
 
   const handleGenerate = useCallback(async (fn: () => Promise<any>) => {
     setLoading(true)
@@ -256,6 +265,76 @@ export default function EditorView() {
     setLoading(false)
   }, [])
 
+  const handlePipelineVoiceover = useCallback(async () => {
+    if (!pipeVideoPath || !pipeVoiceoverText) return
+    setLoading(true)
+    setPipeResult(null)
+    try {
+      const r = await pipelineVoiceover(pipeVideoPath, pipeVoiceoverText, pipeVoice)
+      setPipeResult(r)
+      if (!r.ok) setError(r.error || 'Failed')
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [pipeVideoPath, pipeVoiceoverText, pipeVoice])
+
+  const handlePipelineSlideshow = useCallback(async () => {
+    if (!pipeImageDir) return
+    setLoading(true)
+    setPipeResult(null)
+    try {
+      const r = await pipelineSlideshow(pipeImageDir, {
+        voiceover: pipeVoiceoverText,
+        voice: pipeVoice,
+      })
+      setPipeResult(r)
+      if (!r.ok) setError(r.error || 'Failed')
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [pipeImageDir, pipeVoiceoverText, pipeVoice])
+
+  const handlePipelineExportAll = useCallback(async () => {
+    if (!pipeVideoPath) return
+    setLoading(true)
+    setPipeResult(null)
+    try {
+      const r = await pipelineExportAll(pipeVideoPath)
+      setPipeResult(r)
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [pipeVideoPath])
+
+  const handlePipelineTrimSilence = useCallback(async () => {
+    if (!pipeVideoPath) return
+    setLoading(true)
+    setPipeResult(null)
+    try {
+      const r = await pipelineTrimSilence(pipeVideoPath)
+      setPipeResult(r)
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [pipeVideoPath])
+
+  const handlePipelineThumbGrid = useCallback(async () => {
+    if (!pipeVideoPath) return
+    setLoading(true)
+    setPipeResult(null)
+    try {
+      const r = await pipelineThumbnailGrid(pipeVideoPath)
+      setPipeResult(r)
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [pipeVideoPath])
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'poster', label: 'Poster' },
     { id: 'banner', label: 'Banner' },
@@ -267,6 +346,7 @@ export default function EditorView() {
     { id: 'pinterest', label: 'Pinterest' },
     { id: 'ai_gen', label: 'AI Gen' },
     { id: 'google_flow', label: 'Flow' },
+    { id: 'pipeline', label: 'Pipeline' },
   ]
 
   return (
@@ -694,6 +774,80 @@ export default function EditorView() {
                 </div>
               ) : (
                 <div className="text-kaihara-danger">{flowResult.error}</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pipeline Tab */}
+      {tab === 'pipeline' && (
+        <div className="hud-panel">
+          <h4 className="text-[10px] text-kaihara-muted mb-3">VIDEO PIPELINE AUTOMATION</h4>
+
+          {/* Video Path */}
+          <div className="mb-3">
+            <label className="text-[10px] text-kaihara-muted">Video Path</label>
+            <input value={pipeVideoPath} onChange={e => setPipeVideoPath(e.target.value)}
+              className="kaihara-input w-full text-xs mt-1" placeholder="/path/to/video.mp4" />
+          </div>
+
+          {/* Voiceover Section */}
+          <div className="mb-3 p-2 bg-black/20 rounded">
+            <div className="text-[10px] text-kaihara-accent mb-2">AUTO VOICEOVER</div>
+            <div className="flex gap-2 mb-2">
+              <input value={pipeVoiceoverText} onChange={e => setPipeVoiceoverText(e.target.value)}
+                className="kaihara-input flex-1 text-xs" placeholder="Voiceover text..." />
+              <select value={pipeVoice} onChange={e => setPipeVoice(e.target.value)}
+                className="kaihara-input text-xs w-24">
+                <option value="yasmin">Yasmin (F)</option>
+                <option value="osman">Osman (M)</option>
+              </select>
+              <button onClick={handlePipelineVoiceover} disabled={loading}
+                className="kaihara-btn text-xs px-3">
+                {loading ? '...' : 'Apply'}
+              </button>
+            </div>
+          </div>
+
+          {/* Slideshow Section */}
+          <div className="mb-3 p-2 bg-black/20 rounded">
+            <div className="text-[10px] text-kaihara-accent mb-2">AUTO SLIDESHOW</div>
+            <div className="flex gap-2">
+              <input value={pipeImageDir} onChange={e => setPipeImageDir(e.target.value)}
+                className="kaihara-input flex-1 text-xs" placeholder="Image directory path..." />
+              <button onClick={handlePipelineSlideshow} disabled={loading}
+                className="kaihara-btn text-xs px-3">
+                {loading ? '...' : 'Create'}
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={handlePipelineExportAll} disabled={loading || !pipeVideoPath}
+              className="kaihara-btn text-xs px-3">
+              Export All Sizes
+            </button>
+            <button onClick={handlePipelineTrimSilence} disabled={loading || !pipeVideoPath}
+              className="kaihara-btn text-xs px-3">
+              Trim Silence
+            </button>
+            <button onClick={handlePipelineThumbGrid} disabled={loading || !pipeVideoPath}
+              className="kaihara-btn text-xs px-3">
+              Thumbnail Grid
+            </button>
+          </div>
+
+          {/* Result */}
+          {pipeResult && (
+            <div className="mt-3 p-2 bg-black/20 rounded text-[10px]">
+              {pipeResult.ok ? (
+                <div className="text-kaihara-success">
+                  ✓ {pipeResult.output || pipeResult.exports ? `Exported ${pipeResult.exports?.length || 1} formats` : 'Done'}
+                </div>
+              ) : (
+                <div className="text-kaihara-danger">{pipeResult.error}</div>
               )}
             </div>
           )}
