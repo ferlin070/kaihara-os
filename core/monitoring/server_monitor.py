@@ -134,6 +134,13 @@ async def check_all_servers() -> dict:
 
 HOST_AGENT = "http://192.168.1.99:7100"
 
+# Cache: ping sweep is expensive (~2-15s). Serve cached instantly,
+# refresh in background when stale (stale-while-revalidate).
+_cache: dict | None = None
+_cache_ts: float = 0.0
+_CACHE_TTL = 45  # seconds
+_refreshing = False
+
 
 async def fetch_host_data() -> dict | None:
     try:
@@ -147,7 +154,36 @@ async def fetch_host_data() -> dict | None:
 
 
 async def check_all() -> dict:
-    """Full monitoring: servers + host system + tailscale + guests + internet."""
+    """Full monitoring with 45s cache. Returns cached instantly,
+    refreshes in background when stale."""
+    global _cache, _cache_ts, _refreshing
+    now = time.time()
+    if _cache is not None and (now - _cache_ts) < _CACHE_TTL:
+        data = dict(_cache)
+        data["cached"] = True
+        data["age_s"] = round(now - _cache_ts, 1)
+        return data
+    if _cache is not None and not _refreshing:
+        # stale-while-revalidate: serve old, refresh bg
+        _refreshing = True
+        asyncio.create_task(_refresh_bg())
+        data = dict(_cache)
+        data["cached"] = True
+        data["stale"] = True
+        return data
+    return await _do_check()
+
+
+async def _refresh_bg():
+    global _cache, _cache_ts, _refreshing
+    try:
+        await _do_check()
+    finally:
+        _refreshing = False
+
+
+async def _do_check() -> dict:
+    global _cache, _cache_ts
     host_task = asyncio.create_task(fetch_host_data())
     servers = await check_all_servers()
 
@@ -189,7 +225,7 @@ async def check_all() -> dict:
         guests = host.get("guests")
 
     up_count = sum(1 for r in servers["servers"] if r["status"] == "UP")
-    return {
+    _cache = {
         "servers": servers["servers"],
         "summary": {"total": len(servers["servers"]), "up": up_count,
                     "down": len(servers["servers"]) - up_count},
@@ -198,4 +234,6 @@ async def check_all() -> dict:
         "proxmox_guests": guests,
         "timestamp": time.time(),
     }
+    _cache_ts = time.time()
+    return dict(_cache)
 import httpx

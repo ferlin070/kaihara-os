@@ -53,7 +53,7 @@ export default function ServerMonitor() {
 
   useEffect(() => {
     fetchServers()
-    const i = setInterval(fetchServers, 10000)
+    const i = setInterval(fetchServers, 30000)
     return () => clearInterval(i)
   }, [fetchServers])
 

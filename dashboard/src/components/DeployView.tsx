@@ -21,7 +21,7 @@ export default function DeployView() {
   const [lxc, setLxc] = useState<any[]>([])
   const [gitInfo, setGitInfo] = useState<any>(null)
   const [history, setHistory] = useState<DeployHistoryEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const [actionLog, setActionLog] = useState<string[]>([])
   const [selectedContainer, setSelectedContainer] = useState<string | null>(null)
   const [containerLogs, setContainerLogs] = useState<string>('')
@@ -84,7 +84,6 @@ export default function DeployView() {
     setContainerLogs(r.logs || r.error || 'No logs')
   }
 
-  if (loading) return <div className="hud-panel"><div className="text-xs text-kaihara-muted animate-pulse">Loading deploy...</div></div>
 
   return (
     <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto overflow-y-auto min-h-0 h-full">
