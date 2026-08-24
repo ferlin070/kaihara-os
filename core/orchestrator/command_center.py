@@ -195,8 +195,10 @@ class CommandCenter:
 
         intent = await self.intent_parser.parse(message)
 
-        # Telegram direct-send: explicit request from non-telegram source
-        tg_sent = False
+        intent = await self.intent_parser.parse(message)
+
+        # Telegram delivery: process task first, then SEND THE ANSWER
+        # to user's Telegram (formatted), from non-telegram sources.
         if (source != "telegram" and not _is_telegram_conv(conv_id)
                 and TG_SEND_TRIGGER.search(message)):
             try:
@@ -204,19 +206,44 @@ class CommandCenter:
                     send_telegram_message, telegram_status)
                 st = telegram_status()
                 if st.get("configured"):
-                    tg = send_telegram_message(f"Kaihara: {message}")
+                    # 0) Strip delivery phrase from the question
+                    clean_q = _re.sub(
+                        r"[,]?\s*(dan\s*)?(hantar|send)\s+(ke\s+)?"
+                        r"(telegram(\s+saya)?|tg)\b[!.\s]*$",
+                        "", message, flags=_re.IGNORECASE).strip() \
+                            or message
+                    # Re-parse intent on cleaned question
+                    intent = await self.intent_parser.parse(clean_q)
+                    # 1) Get the actual AI answer using normal pipeline
+                    route = await self.split_brain.decide(intent)
+                    context_tg = (self.memory.super_context(clean_q)
+                                  if self.memory else "")
+                    if route == "deep":
+                        fleet_result = await self.fleet.dispatch(intent)
+                        answer = self._format_response(fleet_result, route)
+                    else:
+                        refl = await self._reflex(clean_q, context_tg,
+                                                  conv_id)
+                        answer = refl.get("text", "")
+
+                    # 2) Send the formatted ANSWER to Telegram
+                    tg = send_telegram_message(answer)
+
                     if tg.get("ok"):
                         ids = ", ".join(
                             str(d["chat_id"]) for d in tg["details"])
                         response_text = (
-                            f"✅ **Hantar ke Telegram berjaya!**\n\n"
-                            f"Mesej: \"{message}\"\n"
-                            f"Bot: {st.get('bot_username')}\n"
-                            f"Chat ID: {ids}")
-                        self.memory.store(response_text, source=source,
-                                          agent="kaihara")
-                        self.memory.add_context(conv_id, "assistant",
-                                                response_text)
+                            f"✅ **Jawapan dihantar ke Telegram anda!**\n\n"
+                            f"Soalan: \"{clean_q}\"\n"
+                            f"Bot: {st.get('bot_username')} | Chat: {ids}\n\n"
+                            f"--- Pratonton jawapan ---\n{answer[:600]}")
+                        if self.memory:
+                            self.memory.store(answer, source=source,
+                                              agent="kaihara")
+                            self.memory.add_context(conv_id, "user",
+                                                    clean_q)
+                            self.memory.add_context(conv_id, "assistant",
+                                                    answer)
                         return {
                             "source": source, "route": "telegram_send",
                             "response": response_text, "intent": intent,

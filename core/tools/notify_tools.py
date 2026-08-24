@@ -19,8 +19,9 @@ def _default_chat_ids() -> list[str]:
     return [i.strip() for i in raw.split(",") if i.strip()]
 
 
-def send_telegram_message(message: str, chat_id: str | None = None) -> dict:
-    """Send a message via Telegram Bot API."""
+def send_telegram_message(message: str, chat_id: str | None = None,
+                          formatted: bool = True) -> dict:
+    """Send a message via Telegram Bot API (auto-formatted HTML)."""
     token = _get_token()
     if not token:
         return {"ok": False, "error": "TELEGRAM_BOT_TOKEN not set"}
@@ -29,13 +30,25 @@ def send_telegram_message(message: str, chat_id: str | None = None) -> dict:
     if not chat_ids:
         return {"ok": False, "error": "No chat_id provided or allowed"}
 
+    if formatted:
+        try:
+            import sys as _sys
+            from core.tools.tg_format import md_to_telegram_html
+            message = md_to_telegram_html(message)
+            parse_mode = "HTML"
+        except Exception:
+            parse_mode = "Markdown"
+    else:
+        parse_mode = "Markdown"
+
     results = []
     for cid in chat_ids:
         try:
             r = httpx.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
                 json={"chat_id": int(cid), "text": message[:4000],
-                      "parse_mode": "Markdown"},
+                      "parse_mode": parse_mode, "link_preview_options":
+                      {"is_disabled": True}},
                 timeout=15,
             )
             d = r.json()

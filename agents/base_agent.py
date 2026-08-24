@@ -250,8 +250,9 @@ class GenericAgent(BaseAgent):
             full_context = "\n\n".join(
                 x for x in (skill_context, memory_context, web_context) if x)
 
-            # Telegram send: execute directly when explicitly requested
-            if TG_TRIGGER.search(task):
+            # Telegram send: only for pure messaging tasks.
+            # Research/web tasks: skip (CommandCenter delivers final answer)
+            if TG_TRIGGER.search(task) and not WEB_TRIGGER.search(task):
                 st = telegram_status()
                 if st.get("configured"):
                     tg_result = send_telegram_message(f"Kaihara: {task}")

@@ -9,6 +9,9 @@ import sys
 import asyncio
 import httpx
 
+sys.path.insert(0, "/opt")
+from tg_format import md_to_telegram_html, wrap_reply
+
 # --- Config ---
 CORE_API = os.environ.get("KAIHARA_API", "http://192.168.1.211:7000")
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -17,14 +20,14 @@ ALLOWED = {i.strip() for i in os.environ.get(
 MAX_REPLY = 4000  # Telegram message limit
 
 
-async def ask_kaihara(text: str, conv_id: str) -> str:
-    """Send message to Kaihara core and get response."""
+async def ask_kaihara(text: str, conv_id: str) -> dict:
+    """Send message to Kaihara core. Returns full response dict."""
     async with httpx.AsyncClient(timeout=300) as client:
         r = await client.post(f"{CORE_API}/api/chat", json={
             "message": text, "source": "telegram", "conv_id": conv_id,
         })
         r.raise_for_status()
-        return r.json().get("response", "")
+        return r.json()
 
 
 async def main():
@@ -53,10 +56,21 @@ async def main():
 
         task = asyncio.create_task(typing())
         try:
-            reply = await ask_kaihara(update.message.text, conv)
-            # Split long replies into chunks
-            for i in range(0, len(reply), MAX_REPLY):
-                await update.message.reply_text(reply[i:i + MAX_REPLY])
+            res = await ask_kaihara(update.message.text, conv)
+            raw = res.get("response", "")
+            route = res.get("route", "")
+            provider = res.get("provider", "")
+
+            # Format cantik macam dashboard (tables/headers/bold)
+            formatted = wrap_reply(
+                md_to_telegram_html(raw),
+                agent="Kaihara",
+                route=route,
+                provider=provider,
+            )
+            for i in range(0, len(formatted), MAX_REPLY):
+                await update.message.reply_text(
+                    formatted[i:i + MAX_REPLY], parse_mode="HTML")
         except Exception as e:
             await update.message.reply_text(f"⚠️ Error: {e}")
         finally:
