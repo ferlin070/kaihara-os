@@ -61,6 +61,17 @@ def create_app(command_center) -> FastAPI:
                     log.warning(f"Channel {name}: {res['error']}")
                 else:
                     log.info(f"Channel {name}: started")
+        # Vault reverse sync (edit vault -> memory)
+        if command_center.memory:
+            from core.monitoring.vault_sync import watch_vault
+            vault_path = command_center.config.get("system", {}).get(
+                "obsidian_vault", "./obsidian-vault")
+            import os as _os
+            full_vault = _os.path.abspath(vault_path)
+            data_dir = _os.path.join(_os.path.dirname(full_vault), "data")
+            asyncio.create_task(watch_vault(
+                command_center.memory, full_vault, data_dir))
+            log.info(f"Vault sync: watching {full_vault}")
 
     @app.get("/")
     async def root():

@@ -123,5 +123,6 @@ class WhatsAppChannel(BaseChannel):
             **super().status(),
             "bridge_running": self._process is not None,
             "qr_pending": self._qr_code is not None,
+            "qr": self._qr_code,
             "last_error": getattr(self, "_last_error", None),
         }

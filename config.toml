@@ -165,7 +165,7 @@ enabled = false
 allowed_chat_ids = ["8275355102"]
 
 [channel.whatsapp]
-enabled = false
+enabled = true
 
 [channel.email]
 enabled = false

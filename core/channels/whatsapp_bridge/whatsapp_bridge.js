@@ -18,12 +18,16 @@
  *   # Then send/receive via stdin/stdout
  */
 
-import makeWASocket from '@whiskeysockets/baileys/lib/Socket/socket.js'
-import { useMultiFileAuthState } from '@whiskeysockets/baileys/lib/Utils/use-multi-file-auth-state.js'
-import { DisconnectReason } from '@whiskeysockets/baileys/lib/Types/Message.js'
+import makeWASocket from '@whiskeysockets/baileys'
+import { useMultiFileAuthState } from '@whiskeysockets/baileys'
+import { fetchLatestBaileysVersion } from '@whiskeysockets/baileys'
+import { DisconnectReason } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
+import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import { readFileSync } from 'fs'
+
+const logger = pino({ level: 'silent' })
 
 const AUTH_DIR = './data/whatsapp_auth'
 
@@ -74,10 +78,12 @@ async function handlePythonMessage(msg, sock) {
 async function connectToWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
 
+  const { version } = await fetchLatestBaileysVersion()
   const sock = makeWASocket({
-    authState: state,
+    auth: state,
     printQRInTerminal: false,
-    logger: { level: 'silent' },
+    logger,
+    version,
     browser: ['Kaihara OS', 'Chrome', '1.0.0'],
   })
 
