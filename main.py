@@ -209,6 +209,17 @@ def init_kaihara() -> CommandCenter:
     )
     FleetManager.register("deploy", DeployAgent)
 
+    # Editor Agent (video editing, image generation, stock media)
+    from agents.editor_agent import EditorAgent
+    cc._editor_agent = EditorAgent(
+        config={**config, "media_dir": str(ROOT / "data" / "media")},
+        memory=memory,
+        model_router=model_router,
+        token_juice=token_juice,
+        approval_gate=cc._approval_gate,
+    )
+    FleetManager.register("editor", EditorAgent)
+
     FleetManager.register("research", create_agent_class("research", "research.md"))
 
     # Meta Agent (learns from all other agents)

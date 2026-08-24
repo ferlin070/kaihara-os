@@ -14,6 +14,7 @@ import PendingApprovals from './components/PendingApprovals'
 import MarketingDashboard from './components/MarketingDashboard'
 import SystemStatsWidget from './components/SystemStatsWidget'
 import DeployView from './components/DeployView'
+import EditorView from './components/EditorView'
 import ChannelStatus from './components/ChannelStatus'
 import KernelStatus from './components/KernelStatus'
 import MetaPanel from './components/MetaPanel'
@@ -36,7 +37,7 @@ export default function App() {
   const [thinking, setThinking] = useState(false)
   const [agents, setAgents] = useState<{name: string; status: string; task: string; progress: number}[]>([])
   const [notifications, setNotifications] = useState<{type: string; text: string}[]>([])
-  const [activeTab, setActiveTab] = useState<'chat' | 'map' | 'tasks' | 'skills' | 'security' | 'memory' | 'daemon' | 'marketing' | 'deploy'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'map' | 'tasks' | 'skills' | 'security' | 'memory' | 'daemon' | 'marketing' | 'deploy' | 'editor'>('chat')
   const [activeConvId, setActiveConvId] = useState<string>(
     () => localStorage.getItem(ACTIVE_CONV_KEY) || 'dashboard')
   const [conversations, setConversations] = useState<Conv[]>([])
@@ -204,7 +205,7 @@ export default function App() {
         <main className="flex-1 flex flex-col min-w-0">
           {/* Tabs — fixed height */}
           <div className="flex-shrink-0 flex border-b border-kaihara-border">
-            {(['chat', 'map', 'tasks', 'skills', 'security', 'memory', 'daemon', 'marketing', 'deploy'] as const).map(tab => (
+            {(['chat', 'map', 'tasks', 'skills', 'security', 'memory', 'daemon', 'marketing', 'deploy', 'editor'] as const).map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`px-5 py-2.5 text-sm font-medium uppercase tracking-wide transition-colors ${
                   activeTab === tab ? 'text-kaihara-accent border-b-2 border-kaihara-accent' : 'text-kaihara-muted hover:text-kaihara-text'
@@ -225,6 +226,7 @@ export default function App() {
             {activeTab === 'daemon' && <DaemonView />}
             {activeTab === 'marketing' && <MarketingDashboard />}
             {activeTab === 'deploy' && <DeployView />}
+            {activeTab === 'editor' && <EditorView />}
           </div>
         </main>
 

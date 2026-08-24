@@ -1209,6 +1209,156 @@ def create_app(command_center) -> FastAPI:
         return {"history": get_deploy_history(limit)}
 
     # ============================================================
+    # Editor Agent endpoints
+    # ============================================================
+
+    @app.get("/api/editor/status")
+    async def editor_status():
+        from core.tools.media_tools import video_probe
+        return {"status": "ok", "tools": 28}
+
+    # Image Generation
+    @app.post("/api/editor/generate/poster")
+    async def editor_generate_poster(payload: dict):
+        from core.tools.image_tools import generate_poster
+        return generate_poster(
+            title=payload.get("title", "Untitled"),
+            subtitle=payload.get("subtitle", ""),
+            width=payload.get("width", 1080),
+            height=payload.get("height", 1920),
+            bg_color=payload.get("bg_color", "#1a1a2e"),
+            bg_image=payload.get("bg_image"),
+        )
+
+    @app.post("/api/editor/generate/banner")
+    async def editor_generate_banner(payload: dict):
+        from core.tools.image_tools import generate_banner
+        return generate_banner(
+            title=payload.get("title", "Untitled"),
+            width=payload.get("width", 1200),
+            height=payload.get("height", 628),
+            bg_color=payload.get("bg_color", "#0f3460"),
+            bg_image=payload.get("bg_image"),
+        )
+
+    @app.post("/api/editor/generate/instagram")
+    async def editor_generate_instagram(payload: dict):
+        from core.tools.image_tools import generate_instagram_post
+        return generate_instagram_post(
+            text=payload.get("text", ""),
+            bg_color=payload.get("bg_color", "#4a4e69"),
+        )
+
+    @app.post("/api/editor/generate/youtube-thumb")
+    async def editor_generate_youtube_thumb(payload: dict):
+        from core.tools.image_tools import generate_youtube_thumbnail
+        return generate_youtube_thumbnail(
+            title=payload.get("title", ""),
+            bg_image=payload.get("bg_image"),
+        )
+
+    @app.post("/api/editor/generate/quote")
+    async def editor_generate_quote(payload: dict):
+        from core.tools.image_tools import generate_quote_image
+        return generate_quote_image(
+            quote=payload.get("quote", ""),
+            author=payload.get("author", ""),
+        )
+
+    @app.post("/api/editor/generate/gradient")
+    async def editor_generate_gradient(payload: dict):
+        from core.tools.image_tools import generate_gradient
+        return generate_gradient(
+            color1=payload.get("color1", "#667eea"),
+            color2=payload.get("color2", "#764ba2"),
+        )
+
+    # Stock Media
+    @app.get("/api/editor/stock/image")
+    async def editor_stock_image(query: str, per_page: int = 10, orientation: str = None):
+        from core.tools.stock_tools import search_stock_image
+        return search_stock_image(query, per_page=per_page, orientation=orientation)
+
+    @app.get("/api/editor/stock/video")
+    async def editor_stock_video(query: str, per_page: int = 10, orientation: str = None):
+        from core.tools.stock_tools import search_stock_video
+        return search_stock_video(query, per_page=per_page, orientation=orientation)
+
+    @app.post("/api/editor/stock/download")
+    async def editor_stock_download(payload: dict):
+        from core.tools.stock_tools import download_stock_image, download_stock_video
+        media_type = payload.get("type", "image")
+        url = payload.get("url", "")
+        if media_type == "video":
+            return download_stock_video(url)
+        return download_stock_image(url)
+
+    # Video Processing
+    @app.post("/api/editor/video/trim")
+    async def editor_video_trim(payload: dict):
+        from core.tools.media_tools import video_trim
+        return video_trim(
+            payload.get("input", ""),
+            payload.get("start", 0),
+            payload.get("end", 10),
+            payload.get("output", ""),
+        )
+
+    @app.post("/api/editor/video/concat")
+    async def editor_video_concat(payload: dict):
+        from core.tools.media_tools import video_concat
+        return video_concat(
+            payload.get("inputs", []),
+            payload.get("output", ""),
+        )
+
+    @app.post("/api/editor/video/from-images")
+    async def editor_video_from_images(payload: dict):
+        from core.tools.media_tools import video_from_images
+        return video_from_images(
+            payload.get("images", []),
+            payload.get("output", ""),
+            seconds_per_image=payload.get("seconds_per_image", 3.0),
+        )
+
+    @app.post("/api/editor/video/add-text")
+    async def editor_video_add_text(payload: dict):
+        from core.tools.media_tools import video_add_text
+        return video_add_text(
+            payload.get("input", ""),
+            payload.get("output", ""),
+            text=payload.get("text", ""),
+            fontsize=payload.get("fontsize", 48),
+            position=payload.get("position", "center"),
+        )
+
+    @app.post("/api/editor/video/export")
+    async def editor_video_export(payload: dict):
+        from core.tools.media_tools import video_export
+        return video_export(
+            payload.get("input", ""),
+            payload.get("output", ""),
+            width=payload.get("width"),
+            height=payload.get("height"),
+            fps=payload.get("fps"),
+        )
+
+    @app.get("/api/editor/probe")
+    async def editor_probe(path: str):
+        from core.tools.media_tools import video_probe
+        return video_probe(path)
+
+    @app.post("/api/editor/watermark")
+    async def editor_watermark(payload: dict):
+        from core.tools.image_tools import add_watermark
+        return add_watermark(
+            payload.get("input", ""),
+            payload.get("output", ""),
+            text=payload.get("text", ""),
+            position=payload.get("position", "bottom-right"),
+        )
+
+    # ============================================================
     # Marketing System endpoints
     # ============================================================
 

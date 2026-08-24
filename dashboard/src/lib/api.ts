@@ -1121,6 +1121,110 @@ export async function getDeployHistory(limit = 20): Promise<{ history: DeployHis
 }
 
 // ============================================================
+// Editor Agent
+// ============================================================
+
+export async function getEditorStatus(): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/status`)
+  return res.json()
+}
+
+export async function generatePoster(payload: { title: string; subtitle?: string; bg_color?: string; bg_image?: string }): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/generate/poster`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return res.json()
+}
+
+export async function generateBanner(payload: { title: string; bg_color?: string; bg_image?: string }): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/generate/banner`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return res.json()
+}
+
+export async function generateInstagramPost(payload: { text: string; bg_color?: string }): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/generate/instagram`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return res.json()
+}
+
+export async function generateYoutubeThumb(payload: { title: string; bg_image?: string }): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/generate/youtube-thumb`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return res.json()
+}
+
+export async function generateQuoteImage(payload: { quote: string; author?: string }): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/generate/quote`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return res.json()
+}
+
+export async function searchStockImage(query: string, perPage = 10): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/stock/image?query=${encodeURIComponent(query)}&per_page=${perPage}`)
+  return res.json()
+}
+
+export async function searchStockVideo(query: string, perPage = 10): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/stock/video?query=${encodeURIComponent(query)}&per_page=${perPage}`)
+  return res.json()
+}
+
+export async function videoTrim(input: string, start: number, end: number, output: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/video/trim`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input, start, end, output }),
+  })
+  return res.json()
+}
+
+export async function videoConcat(inputs: string[], output: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/video/concat`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inputs, output }),
+  })
+  return res.json()
+}
+
+export async function videoFromImages(images: string[], output: string, secondsPerImage = 3): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/video/from-images`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ images, output, seconds_per_image: secondsPerImage }),
+  })
+  return res.json()
+}
+
+export async function videoAddText(input: string, text: string, output: string, position = 'center'): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/video/add-text`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input, text, output, position }),
+  })
+  return res.json()
+}
+
+export async function videoExport(input: string, output: string, width?: number, height?: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/video/export`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input, output, width, height }),
+  })
+  return res.json()
+}
+
+export async function mediaProbe(path: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/editor/probe?path=${encodeURIComponent(path)}`)
+  return res.json()
+}
+
+// ============================================================
 // Meta Agent
 // ============================================================
 

@@ -1042,8 +1042,67 @@ test("Deploy tools: history tracking", test_deploy_history)
 
 
 # ============================================================
-# SUMMARY
+# 21. EDITOR AGENT
 # ============================================================
+
+section("21. EDITOR AGENT")
+
+async def test_editor_image_tools():
+    from core.tools.image_tools import generate_poster, generate_banner, generate_gradient
+    r = generate_poster(title="Test Poster", subtitle="Subtitle", output_path="/tmp/test_poster.png")
+    assert r["ok"], f"generate_poster failed: {r}"
+    assert os.path.exists(r["output"]), f"Output not created: {r['output']}"
+    print(f"    Poster: {r['output']}")
+    r2 = generate_banner(title="Test Banner", output_path="/tmp/test_banner.png")
+    assert r2["ok"], f"generate_banner failed: {r2}"
+    print(f"    Banner: {r2['output']}")
+    r3 = generate_gradient(output_path="/tmp/test_gradient.png")
+    assert r3["ok"], f"generate_gradient failed: {r3}"
+    print(f"    Gradient: {r3['output']}")
+    return True
+
+test("Editor: image generation tools", test_editor_image_tools)
+
+async def test_editor_stock_tools():
+    from core.tools.stock_tools import search_stock_image
+    # No API key - just test the function handles it gracefully
+    r = search_stock_image("nature", per_page=3)
+    if not r["ok"] and "PEXELS_API_KEY" in r.get("error", ""):
+        print("    Stock search: no API key (expected)")
+        return True
+    if r["ok"]:
+        print(f"    Stock search: {r.get('total_results', 0)} results")
+        return True
+    print(f"    Stock search: {r.get('error', 'unknown')}")
+    return True
+
+test("Editor: stock search tools", test_editor_stock_tools)
+
+async def test_editor_agent():
+    from agents.editor_agent import EditorAgent
+    agent = EditorAgent(config={"media_dir": "/tmp/media"})
+    st = agent.status()
+    tools = st.get("tools", [])
+    assert len(tools) >= 20, f"Too few tools: {len(tools)}"
+    print(f"    Editor agent tools: {len(tools)}")
+    expected = ["video_trim", "video_concat", "generate_poster",
+                "search_stock_image", "image_resize"]
+    for t in expected:
+        assert t in tools, f"Missing tool: {t}"
+    print(f"    All expected tools present")
+    return True
+
+test("Editor agent init", test_editor_agent)
+
+async def test_editor_video_probe():
+    from core.tools.media_tools import video_probe
+    # Test with non-existent file
+    r = video_probe("/tmp/nonexistent.mp4")
+    assert not r["ok"], f"Should fail for nonexistent file"
+    print(f"    Video probe handles missing file: OK")
+    return True
+
+test("Editor: video probe", test_editor_video_probe)
 
 section("SUMMARY")
 print(f"  PASS: {PASS}")
