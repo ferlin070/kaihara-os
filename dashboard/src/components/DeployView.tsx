@@ -87,7 +87,7 @@ export default function DeployView() {
   if (loading) return <div className="hud-panel"><div className="text-xs text-kaihara-muted animate-pulse">Loading deploy...</div></div>
 
   return (
-    <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto">
+    <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto overflow-y-auto min-h-0 h-full">
       <h2 className="text-sm font-bold text-kaihara-text flex items-center gap-2">
         <span className="text-kaihara-accent">🚀</span> Deploy Agent
       </h2>
