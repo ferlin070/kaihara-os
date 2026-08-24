@@ -261,3 +261,162 @@ PINTEREST_TOOLS = [
         "parameters": {"type": "object", "properties": {}},
     },
 ]
+
+
+# ============================================================
+# Full Media Search — pagination + real image/video resolution
+# ============================================================
+
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+       "AppleWebKit/537.36 Chrome/124.0 Safari/537.36")
+
+
+def _resolve_pin_media(pin_url: str) -> dict:
+    """Fetch a pin page and extract direct i.pinimg/v1.pinimg media URLs."""
+    try:
+        r = httpx.get(pin_url, headers={"User-Agent": _UA},
+                      follow_redirects=True, timeout=15)
+        html = r.text
+        imgs = re.findall(r"https://i\.pinimg\.com/[^\"\\\\ ]+", html)
+        originals = [u for u in imgs if "/originals/" in u]
+        others = sorted(set(u.split("?")[0] for u in imgs))
+        image = (originals[0] if originals
+                 else (others[0] if others else None))
+        vids = re.findall(r"https://v1?\.pinimg\.com/[^\"\\\\ ]+\.mp4", html)
+        return {
+            "pin": pin_url,
+            "image": image,
+            "video": vids[0] if vids else None,
+        }
+    except Exception:
+        return {"pin": pin_url, "image": None, "video": None}
+
+
+def _pick_best_image(images) -> tuple[str | None, str | None]:
+    """Pick largest image URL + thumbnail from lib images dict."""
+    if not isinstance(images, dict):
+        return None, None
+    best_url, best_w, thumb_url = None, -1, None
+    for key, meta in images.items():
+        u = meta.get("url") if isinstance(meta, dict) else meta
+        if not u:
+            continue
+        if "originals" in u:
+            thumb = images.get("236x", {}).get("url", u)
+            return u, thumb
+        w = meta.get("width", 0) if isinstance(meta, dict) else 0
+        if isinstance(w, int) and w > best_w:
+            best_w = w
+            best_url = u
+            thumb_url = images.get("170x", {}).get("url", u)
+    return best_url, (thumb_url or best_url)
+
+
+def search_full(query: str, target_images: int = 100,
+                target_videos: int = 30) -> dict:
+    """Search with pagination until enough pins, resolve real media URLs.
+
+    Returns dict with files[] containing:
+    title, type(image|video), url(direct media), thumb(image), source(pin url)
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from pinterest_downloader import Pinterest
+    p = Pinterest()
+
+    def _paginate(scope: str, target: int) -> list[dict]:
+        collected, bookmark = [], None
+        for _page in range(10):  # safety cap
+            try:
+                kwargs = {"page_size": 25}
+                if bookmark:
+                    kwargs["bookmark"] = bookmark
+                if scope != "pins":
+                    kwargs["scope"] = scope
+                r = p.search(query, **kwargs)
+            except Exception as e:
+                if "scope" in str(e).lower():
+                    r = p.search(query, page_size=25)
+                    if not isinstance(r, dict):
+                        break
+                    kwargs.pop("scope", None)
+                else:
+                    break
+            pins = r.get("pins", []) if isinstance(r, dict) else []
+            if not pins:
+                break
+            collected.extend(pins)
+            bookmark = r.get("bookmark")
+            if len(collected) >= target or not bookmark:
+                break
+        # Dedupe by url
+        seen, uniq = set(), []
+        for pin in collected:
+            u = pin.get("url") or pin.get("link") or ""
+            if u and u not in seen:
+                seen.add(u)
+                uniq.append(pin)
+        return uniq[:target]
+
+    # Gather pins via pagination (images + video scope attempt)
+    image_pins = _paginate("pins", target_images)
+    try:
+        video_pins = _paginate("videos", min(target_videos, 30))
+    except Exception:
+        video_pins = []
+
+    # Build files directly from pins' built-in images dict (fast!)
+    seen_ids, files = set(), []
+    img_count = vid_count = 0
+
+    def _add_pin(pin, default_type):
+        nonlocal img_count, vid_count
+        pid = str(pin.get("id", ""))
+        if not pid or pid in seen_ids:
+            return
+        seen_ids.add(pid)
+        best, thumb = _pick_best_image(pin.get("images"))
+        if not best:
+            return
+        is_vid = (str(pin.get("media_type", "")).lower() == "video"
+                  or default_type == "video")
+        title = str(pin.get("description")
+                    or pin.get("title")
+                    or f"Pin {pid}").strip()[:60] or f"Pin {pid}"
+        eng = pin.get("engagement")
+        files.append({
+            "id": pid,
+            "title": title,
+            "type": "video" if is_vid else "image",
+            "thumb": thumb or best,
+            "url": best,
+            "source": f"https://www.pinterest.com/pin/{pid}/",
+            "engagement": eng if isinstance(eng, int) else None,
+        })
+        if is_vid:
+            vid_count += 1
+        else:
+            img_count += 1
+
+    for pin in image_pins:
+        if img_count >= target_images:
+            break
+        _add_pin(pin, "image")
+    for pin in video_pins:
+        if vid_count >= target_videos:
+            break
+        _add_pin(pin, "video")
+
+    images_count, videos_count = img_count, vid_count
+    note = ""
+    if not files:
+        note = ("Pinterest blocked anonymous access. "
+                "Cuba query lain atau tambah cookies.")
+    return {
+        "ok": True,
+        "files": files,
+        "total": len(files),
+        "images": images_count,
+        "videos": videos_count,
+        "note": note,
+    }

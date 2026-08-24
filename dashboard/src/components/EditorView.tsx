@@ -15,6 +15,13 @@ import {
   pipelineTrimSilence, pipelineExportAll,
 } from '../lib/api'
 
+function getApiBase() {
+  if (window.location.hostname === 'kaihara-ai.nakhodacloud.top') {
+    return 'https://kaihara-api.nakhodacloud.top/api'
+  }
+  return '/api'
+}
+
 type Tab = 'poster' | 'banner' | 'social' | 'stock' | 'video' | 'probe' | 'gdrive' | 'pinterest' | 'ai_gen' | 'google_flow' | 'pipeline'
 
 export default function EditorView() {
@@ -636,53 +643,111 @@ export default function EditorView() {
         </div>
       )}
 
-      {/* Pinterest Tab */}
+      {/* Pinterest Tab — image grid + downloads */}
       {tab === 'pinterest' && (
-        <div className="hud-panel w-full">
-          <h4 className="text-[10px] text-kaihara-muted mb-3">PINTEREST MEDIA</h4>
-          <div className="flex gap-2 mb-3">
-            <input value={pinQuery} onChange={e => setPinQuery(e.target.value)}
-              className="kaihara-input flex-1 text-xs" placeholder="Search Pinterest..."
-              onKeyDown={e => e.key === 'Enter' && handlePinterestSearch()} />
-            <select value={pinType} onChange={e => setPinType(e.target.value as any)}
-              className="kaihara-input text-xs w-24">
-              <option value="all">All</option>
-              <option value="images">Images</option>
-              <option value="videos">Videos</option>
-            </select>
-            <button onClick={handlePinterestSearch} disabled={loading}
-              className="kaihara-btn text-xs px-3">
-              {loading ? '...' : 'Search'}
-            </button>
+        <div className="w-full h-full overflow-y-auto min-h-0 space-y-3">
+          <div className="hud-panel">
+            <h4 className="text-[10px] text-kaihara-muted mb-3">
+              PINTEREST MEDIA — cari & download gambar/video
+            </h4>
+            <div className="flex gap-2 mb-2 flex-wrap">
+              <input value={pinQuery} onChange={e => setPinQuery(e.target.value)}
+                className="kaihara-input flex-1 text-xs min-w-[200px]"
+                placeholder="Cari apa sahaja... (cth: kucing, wallpaper, food)"
+                onKeyDown={e => e.key === 'Enter' && handlePinterestSearch()} />
+              <select value={pinType} onChange={e => setPinType(e.target.value as any)}
+                className="kaihara-input text-xs w-28">
+                <option value="all">All</option>
+                <option value="images">Images</option>
+                <option value="videos">Videos</option>
+              </select>
+              <button onClick={handlePinterestSearch} disabled={loading}
+                className="kaihara-btn text-xs px-4 bg-kaihara-accent text-white rounded disabled:opacity-50">
+                {loading ? '🔄 Mencari (30-60s)...' : '🔍 Search 100+'}
+              </button>
+              <button onClick={handlePinterestLoadDownloads} disabled={loading}
+                className="kaihara-btn text-xs px-3">
+                📥 Downloads
+              </button>
+              <button onClick={() => pinterestClearDownloads().then(() => setPinDownloads([]))}
+                disabled={loading}
+                className="kaihara-btn text-xs px-3 text-kaihara-danger">
+                Clear
+              </button>
+            </div>
+            {pinResults.length > 0 && (
+              <p className="text-xs text-kaihara-muted mb-2">
+                ✅ {pinResults.length} media jumpa — klik ⬇ untuk download
+              </p>
+            )}
           </div>
-          <div className="flex gap-2 mb-3">
-            <button onClick={handlePinterestLoadDownloads} disabled={loading}
-              className="kaihara-btn text-xs px-3">
-              My Downloads
-            </button>
-            <button onClick={() => pinterestClearDownloads().then(() => setPinDownloads([]))}
-              disabled={loading}
-              className="kaihara-btn text-xs px-3 text-kaihara-danger">
-              Clear
-            </button>
-          </div>
-          {pinResults.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 max-h-64 overflow-auto">
+
+          {/* Results grid */}
+          {pinResults.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full">
               {pinResults.map((item: any, i: number) => (
-                <div key={i} className="text-[10px] p-2 bg-black/20 rounded">
-                  <div className="text-kaihara-text truncate">{item.title || 'Untitled'}</div>
-                  <div className="text-kaihara-muted">{item.type}</div>
+                <div key={i} className="hud-panel overflow-hidden flex flex-col">
+                  <div className="relative bg-black/40" style={{ minHeight: '140px' }}>
+                    {item.thumb || item.url ? (
+                      <img
+                        src={(item.thumb || item.url)}
+                        alt={item.title}
+                        loading="lazy"
+                        className="w-full h-full object-cover absolute inset-0"
+                        onError={(e: any) => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                    ) : null}
+                    <span className={`absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                      item.type === 'video'
+                        ? 'bg-kaihara-danger/80 text-white'
+                        : 'bg-kaihara-success/80 text-white'
+                    }`}>
+                      {item.type === 'video' ? '🎬 VIDEO' : '🖼 IMG'}
+                    </span>
+                  </div>
+                  <div className="p-2 flex flex-col gap-1.5 flex-1">
+                    <p className="text-[11px] leading-tight line-clamp-2 break-words flex-1">
+                      {item.title}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      {item.engagement != null && (
+                        <span className="text-[10px] text-kaihara-muted">
+                          ❤️ {item.engagement}
+                        </span>
+                      )}
+                      <a
+                        href={`${getApiBase()}/pinterest/proxy?url=${encodeURIComponent(item.url)}&name=${encodeURIComponent(item.title.slice(0, 40))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-auto px-2 py-1 rounded bg-kaihara-accent/20 text-kaihara-accent hover:bg-kaihara-accent hover:text-white transition-colors"
+                        title="Download media"
+                      >
+                        ⬇ Save
+                      </a>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="hud-panel">
+              <p className="text-sm text-kaihara-muted">
+                Belum ada hasil. Taip query dan tekan Search — sistem akan
+                cari 100 gambar + 30 video dengan thumbnail sebenar.
+              </p>
+            </div>
           )}
+
+          {/* Downloads list */}
           {pinDownloads.length > 0 && (
-            <div className="mt-2">
-              <div className="text-[10px] text-kaihara-muted mb-1">Downloads ({pinDownloads.length}):</div>
-              <div className="grid grid-cols-3 gap-1 max-h-32 overflow-auto">
-                {pinDownloads.map((f: any, i: number) => (
-                  <div key={i} className="text-[10px] p-1 bg-black/20 rounded truncate text-kaihara-text">
-                    {f.name}
+            <div className="hud-panel">
+              <h4 className="text-[10px] text-kaihara-muted mb-2">DOWNLOADED FILES</h4>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {pinDownloads.map((d: any, i: number) => (
+                  <div key={i} className="text-xs flex items-center justify-between px-2 py-1 rounded hover:bg-kaihara-border/30">
+                    <span className="truncate">{typeof d === 'string' ? d : d.name}</span>
                   </div>
                 ))}
               </div>

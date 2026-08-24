@@ -784,8 +784,16 @@ class EditorAgent(BaseAgent):
 
     # ---- Pinterest Tools ----
 
-    async def _pinterest_search(self, query: str, limit: int = 20) -> dict:
-        return self._pinterest.search(query, limit)
+    async def _pinterest_search(self, query: str, limit: int = 100) -> dict:
+        import asyncio as _aio
+        from core.tools.pinterest_tools import search_full
+        target_imgs = max(limit, 100)
+        target_vids = min(30, max(10, limit // 3))
+        try:
+            return await _aio.to_thread(
+                search_full, query, target_imgs, target_vids)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     async def _pinterest_search_images(self, query: str,
                                         limit: int = 20) -> dict:

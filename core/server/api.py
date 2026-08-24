@@ -2098,7 +2098,7 @@ Format as JSON with keys: title, body, hashtags, cta"""
     # ============================================================
 
     @app.get("/api/pinterest/search")
-    async def pinterest_search(query: str, limit: int = 20):
+    async def pinterest_search(query: str, limit: int = 100):
         editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
@@ -2134,6 +2134,31 @@ Format as JSON with keys: title, body, hashtags, cta"""
         board_url = payload.get("board_url", "")
         limit = payload.get("limit", 50)
         return await editor._pinterest_download_board(board_url, limit)
+
+    @app.get("/api/pinterest/proxy")
+    async def pinterest_proxy(url: str, name: str = "pin"):
+        """Stream Pinterest media (image/video) — bypass CORS + force download."""
+        import httpx as _httpx
+        from urllib.parse import quote_plus as _qp
+        if not url.startswith(("https://i.pinimg.com", "https://v1.pinimg.com",
+                               "https://v.pinimg.com")):
+            return {"error": "Only pinimg.com URLs allowed"}
+        try:
+            async with _httpx.AsyncClient(timeout=60, follow_redirects=True) as cl:
+                resp = await cl.get(url)
+                resp.raise_for_status()
+                content = resp.content
+            ext = ".mp4" if url.endswith(".mp4") else ".jpg"
+            safe_name = "".join(ch for ch in name if ch.isalnum() or ch in "-_ ")[:50] or "pin"
+            from fastapi.responses import Response
+            disp = f'attachment; filename="{safe_name}{ext}"'
+            return Response(
+                content=content,
+                media_type=("video/mp4" if ext == ".mp4" else "image/jpeg"),
+                headers={"Content-Disposition": disp},
+            )
+        except Exception as e:
+            return {"error": f"proxy failed: {e}"}
 
     @app.get("/api/pinterest/downloads")
     async def pinterest_list_downloads():
