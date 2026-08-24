@@ -8,9 +8,30 @@
   color-scheme: dark;
 }
 
+.light {
+  color-scheme: light;
+}
+
+.light body {
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.light *::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+}
+
+.light *::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: #2a2a2a transparent;
+}
+
+.light * {
+  scrollbar-color: #d1d5db transparent;
 }
 
 *::-webkit-scrollbar {
@@ -37,6 +58,11 @@ body {
   color: #f5f5f5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.light body {
+  background: #ffffff;
+  color: #1a1a1a;
 }
 
 @layer components {
@@ -85,6 +111,18 @@ body {
     @apply inline-block w-2 h-2 rounded-full;
   }
 }
+
+/* Light mode overrides */
+.light .bg-kaihara-bg { background-color: #ffffff !important; }
+.light .bg-kaihara-surface { background-color: #f9fafb !important; }
+.light .bg-kaihara-card { background-color: #f3f4f6 !important; }
+.light .border-kaihara-border { border-color: #e5e7eb !important; }
+.light .bg-kaihara-hover { background-color: #f3f4f6 !important; }
+.light .text-kaihara-text { color: #1a1a1a !important; }
+.light .text-kaihara-muted { color: #6b7280 !important; }
+.light .text-kaihara-subtle { color: #9ca3af !important; }
+.light .hover\:bg-kaihara-surface:hover { background-color: #f9fafb !important; }
+.light .hover\:bg-kaihara-border\/50:hover { background-color: #e5e7eb50 !important; }
 
 .waveform-bar {
   display: inline-block;

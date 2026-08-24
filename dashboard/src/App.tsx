@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { ThemeProvider, useTheme } from './lib/ThemeContext'
 import KaiharaStatus from './components/KaiharaStatus'
 import Conversation from './components/Conversation'
 import AgentActivity from './components/AgentActivity'
@@ -45,7 +46,20 @@ const TABS = [
   { id: 'workflows' as const, label: 'Workflows', icon: '🔄' },
 ]
 
-export default function App() {
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme()
+  return (
+    <button
+      onClick={toggleTheme}
+      className="p-2 rounded-lg hover:bg-kaihara-hover transition-colors text-kaihara-muted hover:text-kaihara-text"
+      title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+    >
+      {theme === 'dark' ? '☀️' : '🌙'}
+    </button>
+  )
+}
+
+function AppContent() {
   const [status, setStatus] = useState<Status | null>(null)
   const [messages, setMessages] = useState<Msg[]>([])
   const [thinking, setThinking] = useState(false)
@@ -221,6 +235,7 @@ export default function App() {
               </span>
             )}
           </div>
+          <ThemeToggle />
         </header>
 
         {/* Tabs */}
@@ -271,5 +286,13 @@ export default function App() {
         </div>
       </aside>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   )
 }

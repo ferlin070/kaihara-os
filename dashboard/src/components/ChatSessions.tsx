@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   type Conversation,
 } from '../lib/api'
@@ -18,85 +17,58 @@ export default function ChatSessions({
   onRename: (id: string) => void
   onDelete: (id: string) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const [menuFor, setMenuFor] = useState<string | null>(null)
-
-  const active = conversations.find(c => c.conv_id === activeConvId)
-  const activeTitle = active?.title || 'Current Chat'
-
   return (
-    <div className="hud-panel">
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="hud-title">Chats</div>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-wider text-kaihara-muted">Chats</div>
         <button
           onClick={onNewChat}
-          className="text-xs px-2 py-0.5 rounded bg-kaihara-accent text-white hover:opacity-80 transition-opacity"
+          className="text-xs px-2 py-0.5 rounded bg-kaihara-primary text-white hover:bg-kaihara-primary/90 transition-colors"
           title="Start new chat"
         >
           + New
         </button>
       </div>
 
-      {/* Active chat name — click to toggle list */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between text-xs text-left px-2 py-1.5 rounded bg-kaihara-bg border border-kaihara-border hover:border-kaihara-accent transition-colors"
-      >
-        <span className="truncate">{activeTitle}</span>
-        <span className="text-kaihara-muted ml-2">{open ? '▲' : '▼'}</span>
-      </button>
-
-      {/* Conversation list */}
-      {open && (
-        <div className="mt-1.5 max-h-56 overflow-y-auto space-y-0.5">
-          {conversations.length === 0 && (
-            <p className="text-xs text-kaihara-muted px-2 py-1">No saved chats.</p>
-          )}
-          {conversations.map(c => (
-            <div
-              key={c.conv_id}
-              className={`group flex items-center rounded text-xs ${
-                c.conv_id === activeConvId ? 'bg-kaihara-accent/20' : 'hover:bg-kaihara-border/50'
-              }`}
+      <div className="space-y-1">
+        {conversations.length === 0 && (
+          <p className="text-xs text-kaihara-muted py-2 text-center">No saved chats.</p>
+        )}
+        {conversations.map(c => (
+          <div
+            key={c.conv_id}
+            className={`group flex items-center rounded-lg text-xs ${
+              c.conv_id === activeConvId 
+                ? 'bg-kaihara-primary/10 border border-kaihara-primary/30' 
+                : 'hover:bg-kaihara-surface border border-transparent'
+            }`}
+          >
+            <button
+              onClick={() => onSelect(c.conv_id)}
+              className="flex-1 text-left px-3 py-2 truncate min-w-0"
+              title={c.title}
             >
+              <span className="block truncate font-medium">{c.title}</span>
+              <span className="block text-[10px] text-kaihara-muted mt-0.5">
+                {c.message_count} msgs
+              </span>
+            </button>
+            <div className="relative flex-shrink-0 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
-                onClick={() => { onSelect(c.conv_id); setOpen(false) }}
-                className="flex-1 text-left px-2 py-1.5 truncate min-w-0"
-                title={c.title}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const action = prompt('Rename or delete? (r/d)')
+                  if (action === 'r') onRename(c.conv_id)
+                  else if (action === 'd') onDelete(c.conv_id)
+                }}
+                className="p-1 text-kaihara-muted hover:text-kaihara-text rounded"
               >
-                <span className="block truncate">{c.title}</span>
-                <span className="block text-[10px] text-kaihara-muted">
-                  {c.message_count} msgs • {new Date(c.updated_at).toLocaleDateString()}
-                </span>
+                ⋮
               </button>
-              <div className="relative flex-shrink-0 pr-1">
-                <button
-                  onClick={() => setMenuFor(menuFor === c.conv_id ? null : c.conv_id)}
-                  className="px-1.5 py-1 text-kaihara-muted hover:text-kaihara-text"
-                >
-                  ⋮
-                </button>
-                {menuFor === c.conv_id && (
-                  <div className="absolute right-0 top-full mt-0.5 z-10 bg-kaihara-surface border border-kaihara-border rounded shadow-lg w-28">
-                    <button
-                      onClick={() => { onRename(c.conv_id); setMenuFor(null) }}
-                      className="block w-full text-left px-3 py-1.5 hover:bg-kaihara-border/50"
-                    >
-                      ✏️ Rename
-                    </button>
-                    <button
-                      onClick={() => { onDelete(c.conv_id); setMenuFor(null) }}
-                      className="block w-full text-left px-3 py-1.5 text-kaihara-danger hover:bg-kaihara-border/50"
-                    >
-                      🗑 Delete
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
