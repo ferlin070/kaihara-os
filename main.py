@@ -144,6 +144,21 @@ def init_kaihara() -> CommandCenter:
     from core.os.daemon_manager import DaemonManager
     cc._daemon_manager = DaemonManager(cc._kernel, config.get("daemon", {}))
 
+    # Workflow Engine
+    from core.workflow.engine import WorkflowEngine
+    from core.workflow.workflow_store import WorkflowStore
+    from core.workflow.templates import TEMPLATES
+    cc._workflow_store = WorkflowStore()
+    cc._workflow_engine = WorkflowEngine(
+        store=cc._workflow_store,
+        approval_gate=cc._approval_gate,
+        memory=memory,
+        fleet_manager=cc.fleet,
+    )
+    for name, factory in TEMPLATES.items():
+        cc._workflow_engine.register_template(factory())
+    logger.info(f"Workflow Engine: {len(TEMPLATES)} templates registered")
+
     # Agent Map (visualization, ai-town style)
     from core.viz.agent_map import AgentMap
     cc._agent_map = AgentMap()

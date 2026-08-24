@@ -326,9 +326,103 @@ class CommandCenter:
 
     async def _workflow(self, intent: dict) -> dict:
         """Workflow lane: trigger or propose automation."""
+        from core.workflow.engine import WorkflowEngine
+        from core.workflow.workflow_store import WorkflowStore
+        from core.workflow.templates.biz_autopilot import create_biz_autopilot
+
+        text = intent.get("text", "").lower()
+
+        # Check if user wants to start a workflow
+        workflow_keywords = ["cari kedai", "find business", "outreach",
+                            "demo website", "auto workflow", "biz autopilot",
+                            "cari perniagaan", "generate demo"]
+        is_workflow_start = any(kw in text for kw in workflow_keywords)
+
+        if is_workflow_start:
+            # Extract parameters from text
+            niche = "restoran"
+            location = "Malaysia"
+            channel = "email"
+
+            # Simple extraction
+            if "salon" in text or "kedai rambut" in text:
+                niche = "salon"
+            elif "kedai" in text or "shop" in text:
+                niche = "kedai"
+            elif "klinik" in text or "clinic" in text:
+                niche = "klinik"
+            elif "restoran" in text or "restaurant" in text or "makan" in text:
+                niche = "restoran"
+
+            if "johor" in text:
+                location = "Johor Bahru"
+            elif "kl" in text or "kuala lumpur" in text:
+                location = "Kuala Lumpur"
+            elif "penang" in text or "pulau pinang" in text:
+                location = "Penang"
+            elif "selangor" in text:
+                location = "Selangor"
+
+            if "whatsapp" in text or "wa" in text:
+                channel = "whatsapp"
+            elif "both" in text or "dua" in text:
+                channel = "both"
+
+            # Create and run workflow
+            store = WorkflowStore()
+            engine = WorkflowEngine(store=store, memory=self.memory)
+            template = create_biz_autopilot(
+                niche=niche,
+                location=location,
+                outreach_channel=channel,
+            )
+            engine.register_template(template)
+
+            result = await engine.start(
+                "biz_autopilot",
+                input_data={
+                    "niche": niche,
+                    "location": location,
+                    "outreach_channel": channel,
+                }
+            )
+
+            return {
+                "text": (
+                    f"🚀 **Biz Autopilot Dimulakan!**\n\n"
+                    f"**Niche:** {niche}\n"
+                    f"**Lokasi:** {location}\n"
+                    f"**Channel:** {channel}\n"
+                    f"**ID:** `{result.get('workflow_id', 'N/A')}`\n"
+                    f"**Langkah:** {result.get('total_steps', 8)} steps\n\n"
+                    f"Workflow akan automatik:\n"
+                    f"1. 🔍 Cari {niche} tanpa website di {location}\n"
+                    f"2. 📊 Analisa perniagaan\n"
+                    f"3. 🌐 Generate demo website\n"
+                    f"4. 📧 Outreach via {channel}\n"
+                    f"5. ✅ Convert lead kepada client\n"
+                    f"6. 🏗️ Build website client\n"
+                    f"7. 🚀 Deploy ke Vercel\n"
+                    f"8. 💰 Buat invoice\n\n"
+                    f"Cek status: `/api/workflow/{result.get('workflow_id', '')}`"
+                ),
+                "agent": "workflow",
+                "intent": intent,
+            }
+
+        # Default: ask user what they want
         return {
-            "text": ("Workflow detected. I can set up an automation for this. "
-                     "Shall I design the workflow?"),
+            "text": (
+                "🔧 **Workflow Engine Sedia!**\n\n"
+                "Anda boleh:\n\n"
+                "**1. Biz Autopilot** — Cari kedai tanpa website, buat demo, outreach:\n"
+                "   `cari kedai makan di Johor Bahru`\n\n"
+                "**2. Status Workflow** — Cek status workflow yang sedang jalan:\n"
+                "   `status workflow [id]`\n\n"
+                "**3. List Workflows** — Lihat semua workflows:\n"
+                "   `list workflows`\n\n"
+                "Contoh: `cari restoran tanpa website di KL, outreach email`"
+            ),
             "agent": "workflow",
             "intent": intent,
         }

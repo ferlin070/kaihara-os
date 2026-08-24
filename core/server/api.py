@@ -2319,4 +2319,86 @@ Format as JSON with keys: title, body, hashtags, cta"""
             payload.get("video_path", ""),
         )
 
+    # ============================================================
+    # WORKFLOW ENDPOINTS
+    # ============================================================
+
+    from core.workflow.engine import WorkflowEngine
+    from core.workflow.workflow_store import WorkflowStore
+    from core.workflow.templates import TEMPLATES
+
+    workflow_store = WorkflowStore()
+    workflow_engine = WorkflowEngine(store=workflow_store)
+
+    # Register templates
+    for name, factory in TEMPLATES.items():
+        workflow_engine.register_template(factory())
+
+    @app.get("/api/workflow/templates")
+    async def workflow_list_templates():
+        """List all available workflow templates."""
+        return {
+            "templates": [
+                {"name": name, "description": factory().description}
+                for name, factory in TEMPLATES.items()
+            ]
+        }
+
+    @app.post("/api/workflow/start")
+    async def workflow_start(payload: dict):
+        """Start a new workflow."""
+        template_name = payload.get("template", "biz_autopilot")
+        input_data = payload.get("input_data", {})
+
+        if template_name not in TEMPLATES:
+            return {"error": f"Template '{template_name}' not found"}
+
+        factory = TEMPLATES[template_name]
+        template = factory(**{
+            k: v for k, v in input_data.items()
+            if k in ("niche", "location", "outreach_channel", "sender_name")
+        })
+        workflow_engine.register_template(template)
+
+        result = await workflow_engine.start(template_name, input_data)
+        return result
+
+    @app.get("/api/workflow/{workflow_id}")
+    async def workflow_get_status(workflow_id: str):
+        """Get workflow status."""
+        return workflow_engine.get_status(workflow_id)
+
+    @app.get("/api/workflow")
+    async def workflow_list(state: str = None):
+        """List all workflows."""
+        return {"workflows": workflow_engine.list_workflows(state=state)}
+
+    @app.post("/api/workflow/{workflow_id}/pause")
+    async def workflow_pause(workflow_id: str):
+        """Pause a workflow."""
+        return await workflow_engine.pause(workflow_id)
+
+    @app.post("/api/workflow/{workflow_id}/resume")
+    async def workflow_resume(workflow_id: str):
+        """Resume a paused workflow."""
+        return await workflow_engine.resume(workflow_id)
+
+    @app.post("/api/workflow/{workflow_id}/cancel")
+    async def workflow_cancel(workflow_id: str):
+        """Cancel a workflow."""
+        return await workflow_engine.cancel(workflow_id)
+
+    @app.post("/api/workflow/{workflow_id}/approve/{step_index}")
+    async def workflow_approve_step(workflow_id: str, step_index: int,
+                                    payload: dict):
+        """Approve or reject a workflow step."""
+        approved = payload.get("approved", True)
+        return await workflow_engine.approve_step(workflow_id, step_index, approved)
+
+    @app.get("/api/workflow/{workflow_id}/steps")
+    async def workflow_get_steps(workflow_id: str):
+        """Get all steps for a workflow."""
+        steps = workflow_store.get_steps_for_workflow(workflow_id)
+        return {"steps": steps}
+
     return app
