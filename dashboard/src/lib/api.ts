@@ -986,6 +986,141 @@ export async function restartAllDaemonAgents(): Promise<any> {
 }
 
 // ============================================================
+// Deploy Agent
+// ============================================================
+
+export interface DeployStatus {
+  health: { ok: boolean; checks: any[] }
+  disk: { ok: boolean; total_gb: number; used_gb: number; free_gb: number; percent: number }
+  git: { ok: boolean; branch: string; modified_files: number; dirty: boolean }
+}
+
+export interface DockerContainer {
+  ID: string; Names: string; Image: string; Status: string; State: string; Ports: string
+}
+
+export interface DeployHistoryEntry {
+  timestamp: string; action: string; user: string; ok: boolean
+}
+
+export async function getDeployStatus(): Promise<DeployStatus> {
+  const res = await fetch(`${API_BASE}/deploy/status`)
+  return res.json()
+}
+
+export async function getDockerPs(allContainers = false): Promise<{ ok: boolean; containers: DockerContainer[]; count: number }> {
+  const res = await fetch(`${API_BASE}/deploy/docker/ps?all_containers=${allContainers}`)
+  return res.json()
+}
+
+export async function dockerCompose(action: string, service?: string, projectDir?: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/docker/compose`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, service, project_dir: projectDir }),
+  })
+  return res.json()
+}
+
+export async function dockerBuild(image: string, path = '.', tag = 'latest'): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/docker/build`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image, path, tag }),
+  })
+  return res.json()
+}
+
+export async function getDockerLogs(container: string, lines = 50): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/docker/logs/${container}?lines=${lines}`)
+  return res.json()
+}
+
+export async function dockerExec(container: string, command: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/docker/exec`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ container, command }),
+  })
+  return res.json()
+}
+
+export async function getGitStatus(): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/git/status`)
+  return res.json()
+}
+
+export async function gitPullDeploy(): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/git/pull`, { method: 'POST' })
+  return res.json()
+}
+
+export async function gitDeploy(branch = 'master'): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/git/deploy`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ branch }),
+  })
+  return res.json()
+}
+
+export async function gitRollback(commits = 1): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/git/rollback`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ commits }),
+  })
+  return res.json()
+}
+
+export async function getLxcList(): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/lxc/list`)
+  return res.json()
+}
+
+export async function lxcManage(vmid: string, action: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/lxc/manage`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ vmid, action }),
+  })
+  return res.json()
+}
+
+export async function serviceControl(action: string, service: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/service`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, service }),
+  })
+  return res.json()
+}
+
+export async function nginxReload(): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/nginx/reload`, { method: 'POST' })
+  return res.json()
+}
+
+export async function fullDeploy(serviceName?: string, branch = 'master'): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/full`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ service_name: serviceName, branch }),
+  })
+  return res.json()
+}
+
+export async function getDeployHealth(): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/health`)
+  return res.json()
+}
+
+export async function deployRollback(commits = 1, serviceName?: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/deploy/rollback`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ commits, service_name: serviceName }),
+  })
+  return res.json()
+}
+
+export async function getDeployHistory(limit = 20): Promise<{ history: DeployHistoryEntry[] }> {
+  const res = await fetch(`${API_BASE}/deploy/history?limit=${limit}`)
+  return res.json()
+}
+
+// ============================================================
 // Meta Agent
 // ============================================================
 

@@ -968,6 +968,80 @@ test("Marketing agent init", test_marketing_agent)
 
 
 # ============================================================
+# 20. DEPLOY AGENT
+# ============================================================
+
+section("20. DEPLOY AGENT")
+
+async def test_deploy_tools():
+    from core.tools.deploy_tools import disk_check, port_check, git_status
+    dc = disk_check()
+    assert dc["ok"], f"disk_check failed: {dc}"
+    print(f"    Disk: {dc['used_gb']}/{dc['total_gb']} GB ({dc['percent']}%)")
+    pc = port_check(7000)
+    assert pc["ok"], f"port_check failed: {pc}"
+    print(f"    Port 7000: {pc['status']}")
+    gs = git_status()
+    assert gs["ok"], f"git_status failed: {gs}"
+    print(f"    Git branch: {gs['branch']}")
+    return True
+
+test("Deploy tools: disk, port, git", test_deploy_tools)
+
+async def test_deploy_docker():
+    from core.tools.deploy_tools import docker_ps
+    r = docker_ps()
+    # Docker might not be available
+    print(f"    Docker available: {r.get('ok', False)}")
+    if r.get("ok"):
+        print(f"    Containers: {r.get('count', 0)}")
+    return True
+
+test("Deploy tools: docker ps", test_deploy_docker)
+
+async def test_deploy_agent():
+    from agents.deploy_agent import DeployAgent
+    agent = DeployAgent(config={"repo_path": "."})
+    st = agent.status()
+    tools = st.get("tools", [])
+    assert len(tools) >= 15, f"Too few tools: {len(tools)}"
+    print(f"    Deploy agent tools: {len(tools)}")
+    assert "docker_ps" in tools, "Missing docker_ps"
+    assert "git_deploy" in tools, "Missing git_deploy"
+    assert "full_deploy" in tools, "Missing full_deploy"
+    assert "health_check" in tools, "Missing health_check"
+    assert "rollback" in tools, "Missing rollback"
+    print(f"    Tools: {', '.join(tools[:8])}...")
+    return True
+
+test("Deploy agent init", test_deploy_agent)
+
+async def test_deploy_health_check():
+    from core.tools.deploy_tools import health_check
+    r = health_check()
+    assert "checks" in r, f"health_check missing checks: {r}"
+    assert len(r["checks"]) >= 2, f"Too few checks: {r}"
+    # At least disk check should pass
+    disk_ok = any(c["check"] == "disk_space" and c["ok"] for c in r["checks"])
+    assert disk_ok, f"Disk check failed: {r}"
+    print(f"    Health checks: {len(r['checks'])} (disk OK)")
+    return True
+
+test("Deploy tools: health check", test_deploy_health_check)
+
+async def test_deploy_history():
+    from core.tools.deploy_tools import get_deploy_history, record_deploy
+    record_deploy("test_action", {"ok": True}, "test_user")
+    h = get_deploy_history(5)
+    assert len(h) >= 1, "No history recorded"
+    assert h[-1]["action"] == "test_action"
+    print(f"    History entries: {len(h)}")
+    return True
+
+test("Deploy tools: history tracking", test_deploy_history)
+
+
+# ============================================================
 # SUMMARY
 # ============================================================
 

@@ -1092,6 +1092,123 @@ def create_app(command_center) -> FastAPI:
         return svc.update_routing(payload.get("routing", {}))
 
     # ============================================================
+    # Deploy Agent endpoints
+    # ============================================================
+
+    @app.get("/api/deploy/status")
+    async def deploy_status():
+        from core.tools.deploy_tools import health_check, disk_check, git_status
+        hc = health_check()
+        dc = disk_check()
+        gs = git_status()
+        return {"health": hc, "disk": dc, "git": gs}
+
+    @app.get("/api/deploy/docker/ps")
+    async def deploy_docker_ps(all_containers: bool = False):
+        from core.tools.deploy_tools import docker_ps
+        return docker_ps(all_containers)
+
+    @app.post("/api/deploy/docker/compose")
+    async def deploy_docker_compose(payload: dict):
+        from core.tools.deploy_tools import docker_compose
+        return docker_compose(
+            payload.get("action", "ps"),
+            payload.get("service"),
+            payload.get("project_dir", "."),
+        )
+
+    @app.post("/api/deploy/docker/build")
+    async def deploy_docker_build(payload: dict):
+        from core.tools.deploy_tools import docker_build
+        return docker_build(
+            payload.get("image", "app"),
+            payload.get("path", "."),
+            payload.get("tag", "latest"),
+        )
+
+    @app.get("/api/deploy/docker/logs/{container}")
+    async def deploy_docker_logs(container: str, lines: int = 50):
+        from core.tools.deploy_tools import docker_logs
+        return docker_logs(container, lines)
+
+    @app.post("/api/deploy/docker/exec")
+    async def deploy_docker_exec(payload: dict):
+        from core.tools.deploy_tools import docker_exec
+        return docker_exec(payload.get("container", ""), payload.get("command", ""))
+
+    @app.get("/api/deploy/git/status")
+    async def deploy_git_status():
+        from core.tools.deploy_tools import git_status
+        return git_status()
+
+    @app.post("/api/deploy/git/pull")
+    async def deploy_git_pull():
+        from core.tools.deploy_tools import git_pull
+        return git_pull()
+
+    @app.post("/api/deploy/git/deploy")
+    async def deploy_git_deploy(payload: dict):
+        from core.tools.deploy_tools import git_deploy
+        return git_deploy(branch=payload.get("branch", "master"))
+
+    @app.post("/api/deploy/git/rollback")
+    async def deploy_git_rollback(payload: dict):
+        from core.tools.deploy_tools import git_rollback
+        return git_rollback(commits=payload.get("commits", 1))
+
+    @app.get("/api/deploy/lxc/list")
+    async def deploy_lxc_list():
+        from core.tools.deploy_tools import lxc_list
+        return lxc_list()
+
+    @app.post("/api/deploy/lxc/manage")
+    async def deploy_lxc_manage(payload: dict):
+        from core.tools.deploy_tools import lxc_manage
+        return lxc_manage(
+            payload.get("vmid", ""),
+            payload.get("action", "start"),
+        )
+
+    @app.post("/api/deploy/service")
+    async def deploy_service(payload: dict):
+        from core.tools.deploy_tools import systemctl
+        return systemctl(
+            payload.get("action", "status"),
+            payload.get("service", ""),
+        )
+
+    @app.post("/api/deploy/nginx/reload")
+    async def deploy_nginx_reload():
+        from core.tools.deploy_tools import nginx_reload
+        return nginx_reload()
+
+    @app.post("/api/deploy/full")
+    async def deploy_full(payload: dict):
+        from core.tools.deploy_tools import full_deploy
+        return full_deploy(
+            service_name=payload.get("service_name"),
+            branch=payload.get("branch", "master"),
+        )
+
+    @app.get("/api/deploy/health")
+    async def deploy_health():
+        from core.tools.deploy_tools import health_check
+        return health_check()
+
+    @app.post("/api/deploy/rollback")
+    async def deploy_rollback(payload: dict):
+        from core.tools.deploy_tools import rollback
+        return rollback(
+            commits=payload.get("commits", 1),
+            service_name=payload.get("service_name"),
+        )
+
+    @app.get("/api/deploy/history")
+    async def deploy_history(limit: int = 20):
+        from core.tools.deploy_tools import get_deploy_history
+        return {"history": get_deploy_history(limit)}
+
+    # ============================================================
     # Marketing System endpoints
     # ============================================================
 

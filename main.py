@@ -197,7 +197,18 @@ def init_kaihara() -> CommandCenter:
     )
     FleetManager.register("security", SecurityAgent)
 
-    FleetManager.register("deploy", create_agent_class("deploy", "deploy.md"))
+    # Deploy Agent (Docker, Git, Proxmox, CI/CD)
+    from agents.deploy_agent import DeployAgent
+    cc._deploy_agent = DeployAgent(
+        config={**config, "repo_path": str(ROOT),
+                "proxmox_host": config.get("proxmox_host", "192.168.1.99")},
+        memory=memory,
+        model_router=model_router,
+        token_juice=token_juice,
+        approval_gate=cc._approval_gate,
+    )
+    FleetManager.register("deploy", DeployAgent)
+
     FleetManager.register("research", create_agent_class("research", "research.md"))
 
     # Meta Agent (learns from all other agents)
