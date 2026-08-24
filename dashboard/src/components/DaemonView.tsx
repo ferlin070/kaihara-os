@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import ServerMonitor from './ServerMonitor'
 import {
   getDaemonStatus, getDaemonAlerts,
   startDaemonWatchdog, stopDaemonWatchdog,
@@ -119,6 +120,8 @@ export default function DaemonView() {
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+      <ServerMonitor />
       {/* Top Row: Process + Agent Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Process Info */}

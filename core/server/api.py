@@ -781,6 +781,20 @@ def create_app(command_center) -> FastAPI:
         }
 
     # ============================================================
+    # Server Monitor (all servers up/down + internet)
+    # ============================================================
+
+    @app.get("/api/monitor/servers")
+    async def monitor_servers():
+        from core.monitoring.server_monitor import check_all
+        return await check_all()
+
+    @app.get("/api/monitor/internet")
+    async def monitor_internet():
+        from core.monitoring.server_monitor import check_internet
+        return await check_internet()
+
+    # ============================================================
     # Security & Pentest endpoints
     # ============================================================
 
