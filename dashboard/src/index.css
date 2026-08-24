@@ -41,10 +41,16 @@ body {
 
 @layer components {
   .card {
-    @apply bg-kaihara-card border border-kaihara-border rounded-xl p-4 transition-all duration-200;
+    @apply bg-kaihara-card border border-kaihara-border rounded-xl p-3 transition-all duration-200;
   }
   .card-hover {
     @apply card hover:border-kaihara-primary/30 hover:shadow-glow cursor-pointer;
+  }
+  .hud-panel {
+    @apply card;
+  }
+  .hud-title {
+    @apply text-[10px] uppercase tracking-wider text-kaihara-muted mb-2;
   }
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
@@ -62,7 +68,7 @@ body {
     @apply badge bg-kaihara-primary/10 text-kaihara-primary;
   }
   .btn {
-    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200;
+    @apply px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200;
   }
   .btn-primary {
     @apply btn bg-kaihara-primary hover:bg-kaihara-primary/90 text-white shadow-sm;
@@ -71,7 +77,7 @@ body {
     @apply btn bg-transparent hover:bg-kaihara-hover text-kaihara-muted hover:text-kaihara-text;
   }
   .input {
-    @apply w-full bg-kaihara-surface border border-kaihara-border rounded-lg px-4 py-2.5 text-sm 
+    @apply w-full bg-kaihara-surface border border-kaihara-border rounded-lg px-3 py-2 text-sm 
            focus:outline-none focus:border-kaihara-primary focus:ring-1 focus:ring-kaihara-primary/20
            placeholder:text-kaihara-muted transition-all duration-200;
   }

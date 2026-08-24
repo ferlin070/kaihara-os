@@ -56,7 +56,6 @@ export default function App() {
   const [activeConvId, setActiveConvId] = useState<string>(
     () => localStorage.getItem(ACTIVE_CONV_KEY) || 'dashboard')
   const [conversations, setConversations] = useState<Conv[]>([])
-  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const failCountRef = useRef(0)
 
@@ -169,57 +168,47 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen flex bg-kaihara-bg text-kaihara-text overflow-hidden">
-      {/* Left Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-72' : 'w-16'} flex-shrink-0 border-r border-kaihara-border flex flex-col transition-all duration-300`}>
+    <div className="h-screen w-screen flex overflow-hidden bg-kaihara-bg text-kaihara-text">
+      {/* Left Sidebar — fixed width, no shrink */}
+      <aside className="w-64 flex-shrink-0 h-full flex flex-col border-r border-kaihara-border overflow-hidden">
         {/* Logo */}
-        <div className="h-16 flex items-center gap-3 px-4 border-b border-kaihara-border">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+        <div className="h-14 flex items-center gap-3 px-4 border-b border-kaihara-border flex-shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
             K
           </div>
-          {sidebarOpen && (
-            <div className="animate-fade-in">
-              <h1 className="text-lg font-bold tracking-tight">KAIHARA</h1>
-              <p className="text-xs text-kaihara-muted">AI Super-Intelligence</p>
-            </div>
-          )}
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="ml-auto p-2 rounded-lg hover:bg-kaihara-hover text-kaihara-muted transition-colors"
-          >
-            {sidebarOpen ? '◀' : '▶'}
-          </button>
+          <div className="min-w-0">
+            <h1 className="text-base font-bold tracking-tight truncate">KAIHARA</h1>
+            <p className="text-[10px] text-kaihara-muted truncate">AI Super-Intelligence</p>
+          </div>
         </div>
 
-        {/* Chat Sessions */}
-        {sidebarOpen && (
-          <div className="flex-1 overflow-y-auto p-3">
-            <ChatSessions
-              conversations={conversations}
-              activeConvId={activeConvId}
-              onSelect={handleSelectConv}
-              onNewChat={handleNewChat}
-              onRename={handleRenameConv}
-              onDelete={handleDeleteConv}
-            />
-          </div>
-        )}
+        {/* Chat Sessions — scroll */}
+        <div className="flex-1 overflow-y-auto p-3 min-h-0">
+          <ChatSessions
+            conversations={conversations}
+            activeConvId={activeConvId}
+            onSelect={handleSelectConv}
+            onNewChat={handleNewChat}
+            onRename={handleRenameConv}
+            onDelete={handleDeleteConv}
+          />
+        </div>
 
-        {/* Status Panels */}
-        {sidebarOpen && (
-          <div className="border-t border-kaihara-border p-3 space-y-3 max-h-64 overflow-y-auto">
+        {/* Status — scroll, limited height */}
+        <div className="border-t border-kaihara-border overflow-y-auto max-h-48 flex-shrink-0">
+          <div className="p-3 space-y-2">
             <KaiharaStatus thinking={thinking} online={!!status?.kaihara_online} />
             <SystemStatsWidget />
             <ChannelStatus />
           </div>
-        )}
+        </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Center — flex-1, no shrink, column */}
+      <div className="flex-1 min-w-0 h-full flex flex-col">
         {/* Top Bar */}
-        <header className="h-16 flex items-center justify-between px-6 border-b border-kaihara-border flex-shrink-0">
-          <div className="flex items-center gap-4">
+        <header className="h-12 flex items-center justify-between px-5 border-b border-kaihara-border flex-shrink-0">
+          <div className="flex items-center gap-3">
             {status?.kaihara_online ? (
               <span className="badge-success">
                 <span className="status-dot bg-kaihara-success animate-pulse mr-1.5" />
@@ -232,23 +221,23 @@ export default function App() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <KernelStatus />
             <MetaPanel />
           </div>
         </header>
 
         {/* Tabs */}
-        <div className="flex-shrink-0 border-b border-kaihara-border px-4">
-          <div className="flex gap-1 overflow-x-auto">
+        <div className="flex-shrink-0 border-b border-kaihara-border overflow-x-auto">
+          <div className="flex px-3">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all duration-200 border-b-2 -mb-px ${
+                className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 ${
                   activeTab === tab.id
                     ? 'text-kaihara-primary border-kaihara-primary'
-                    : 'text-kaihara-muted border-transparent hover:text-kaihara-text hover:border-kaihara-border'
+                    : 'text-kaihara-muted border-transparent hover:text-kaihara-text'
                 }`}
               >
                 <span>{tab.icon}</span>
@@ -258,27 +247,25 @@ export default function App() {
           </div>
         </div>
 
-        {/* Tab Content */}
+        {/* Tab Content — flex-1, overflow hidden */}
         <div className="flex-1 min-h-0 overflow-hidden">
-          <div className="h-full overflow-y-auto">
-            {activeTab === 'chat' && <Conversation messages={messages} thinking={thinking} onSend={handleSend} />}
-            {activeTab === 'map' && <AgentMap />}
-            {activeTab === 'tasks' && <TaskBoard />}
-            {activeTab === 'skills' && <SkillBrowser />}
-            {activeTab === 'security' && <SecurityView />}
-            {activeTab === 'memory' && <MemoryTree />}
-            {activeTab === 'daemon' && <DaemonView />}
-            {activeTab === 'marketing' && <MarketingDashboard />}
-            {activeTab === 'deploy' && <DeployView />}
-            {activeTab === 'editor' && <EditorView />}
-            {activeTab === 'workflows' && <WorkflowDashboard />}
-          </div>
+          {activeTab === 'chat' && <Conversation messages={messages} thinking={thinking} onSend={handleSend} />}
+          {activeTab === 'map' && <AgentMap />}
+          {activeTab === 'tasks' && <TaskBoard />}
+          {activeTab === 'skills' && <SkillBrowser />}
+          {activeTab === 'security' && <SecurityView />}
+          {activeTab === 'memory' && <MemoryTree />}
+          {activeTab === 'daemon' && <DaemonView />}
+          {activeTab === 'marketing' && <MarketingDashboard />}
+          {activeTab === 'deploy' && <DeployView />}
+          {activeTab === 'editor' && <EditorView />}
+          {activeTab === 'workflows' && <WorkflowDashboard />}
         </div>
       </div>
 
-      {/* Right Sidebar */}
-      <aside className="w-80 flex-shrink-0 border-l border-kaihara-border overflow-y-auto">
-        <div className="p-4 space-y-4">
+      {/* Right Sidebar — fixed width, no shrink, scroll */}
+      <aside className="w-72 flex-shrink-0 h-full border-l border-kaihara-border overflow-y-auto">
+        <div className="p-3 space-y-3">
           <MorningBriefing />
           <PendingApprovals />
           <GoalsTracker />
