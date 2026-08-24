@@ -2056,21 +2056,21 @@ Format as JSON with keys: title, body, hashtags, cta"""
     async def gdrive_media_search(query: str, folder: str = "",
                                    media_type: str = "all",
                                    limit: int = 20):
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         return await editor._gdrive_search_media(query, folder, media_type, limit)
 
     @app.get("/api/gdrive-media/browse")
     async def gdrive_media_browse(path: str = ""):
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         return await editor._gdrive_browse_folder(path)
 
     @app.post("/api/gdrive-media/download")
     async def gdrive_media_download(payload: dict):
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         remote_path = payload.get("remote_path", "")
@@ -2079,7 +2079,7 @@ Format as JSON with keys: title, body, hashtags, cta"""
 
     @app.post("/api/gdrive-media/upload")
     async def gdrive_media_upload(payload: dict):
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         local_path = payload.get("local_path", "")
@@ -2088,7 +2088,7 @@ Format as JSON with keys: title, body, hashtags, cta"""
 
     @app.get("/api/gdrive-media/storage")
     async def gdrive_media_storage():
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         return await editor._gdrive_get_storage_info()
@@ -2099,28 +2099,28 @@ Format as JSON with keys: title, body, hashtags, cta"""
 
     @app.get("/api/pinterest/search")
     async def pinterest_search(query: str, limit: int = 20):
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         return await editor._pinterest_search(query, limit)
 
     @app.get("/api/pinterest/search-images")
     async def pinterest_search_images(query: str, limit: int = 20):
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         return await editor._pinterest_search_images(query, limit)
 
     @app.get("/api/pinterest/search-videos")
     async def pinterest_search_videos(query: str, limit: int = 10):
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         return await editor._pinterest_search_videos(query, limit)
 
     @app.post("/api/pinterest/download-pin")
     async def pinterest_download_pin(payload: dict):
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         url = payload.get("url", "")
@@ -2128,7 +2128,7 @@ Format as JSON with keys: title, body, hashtags, cta"""
 
     @app.post("/api/pinterest/download-board")
     async def pinterest_download_board(payload: dict):
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         board_url = payload.get("board_url", "")
@@ -2137,14 +2137,14 @@ Format as JSON with keys: title, body, hashtags, cta"""
 
     @app.get("/api/pinterest/downloads")
     async def pinterest_list_downloads():
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         return await editor._pinterest_list_downloads()
 
     @app.post("/api/pinterest/clear")
     async def pinterest_clear_downloads():
-        editor = getattr(command_center, "editor_agent", None)
+        editor = getattr(command_center, "_editor_agent", None)
         if not editor:
             return {"error": "editor agent not ready"}
         return await editor._pinterest_clear_downloads()

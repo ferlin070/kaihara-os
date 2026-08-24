@@ -270,7 +270,7 @@ export default function EditorView() {
   ]
 
   return (
-    <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto">
+    <div className="flex flex-col gap-4 p-4 w-full h-full overflow-y-auto min-h-0">
       <h2 className="text-sm font-bold text-kaihara-text flex items-center gap-2">
         <span className="text-kaihara-accent">🎬</span> Editor Agent
       </h2>
@@ -289,7 +289,7 @@ export default function EditorView() {
 
       {/* Poster Tab */}
       {tab === 'poster' && (
-        <div className="hud-panel">
+        <div className="hud-panel w-full">
           <h4 className="text-[10px] text-kaihara-muted mb-3">GENERATE POSTER</h4>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -326,7 +326,7 @@ export default function EditorView() {
 
       {/* Banner Tab */}
       {tab === 'banner' && (
-        <div className="hud-panel">
+        <div className="hud-panel w-full">
           <h4 className="text-[10px] text-kaihara-muted mb-3">GENERATE BANNER</h4>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -357,7 +357,7 @@ export default function EditorView() {
 
       {/* Social Tab */}
       {tab === 'social' && (
-        <div className="hud-panel">
+        <div className="hud-panel w-full">
           <h4 className="text-[10px] text-kaihara-muted mb-3">SOCIAL MEDIA CONTENT</h4>
           <div className="flex gap-2 mb-3">
             {(['instagram', 'youtube', 'quote'] as const).map(type => (
@@ -397,7 +397,7 @@ export default function EditorView() {
 
       {/* Stock Tab */}
       {tab === 'stock' && (
-        <div className="hud-panel">
+        <div className="hud-panel w-full">
           <h4 className="text-[10px] text-kaihara-muted mb-3">STOCK MEDIA SEARCH (Pexels)</h4>
           <div className="flex gap-2 mb-3">
             <input value={stockQuery} onChange={e => setStockQuery(e.target.value)}
@@ -434,7 +434,7 @@ export default function EditorView() {
 
       {/* Video Tab */}
       {tab === 'video' && (
-        <div className="hud-panel">
+        <div className="hud-panel w-full">
           <h4 className="text-[10px] text-kaihara-muted mb-3">VIDEO TOOLS</h4>
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-3">
@@ -478,7 +478,7 @@ export default function EditorView() {
 
       {/* Probe Tab */}
       {tab === 'probe' && (
-        <div className="hud-panel">
+        <div className="hud-panel w-full">
           <h4 className="text-[10px] text-kaihara-muted mb-3">MEDIA PROBE</h4>
           <div className="flex gap-2 mb-3">
             <input value={probePath} onChange={e => setProbePath(e.target.value)}
@@ -499,7 +499,7 @@ export default function EditorView() {
 
       {/* GDrive Tab */}
       {tab === 'gdrive' && (
-        <div className="hud-panel">
+        <div className="hud-panel w-full">
           <h4 className="text-[10px] text-kaihara-muted mb-3">GOOGLE DRIVE MEDIA</h4>
           <div className="flex gap-2 mb-3">
             <input value={gdriveQuery} onChange={e => setGdriveQuery(e.target.value)}
@@ -558,7 +558,7 @@ export default function EditorView() {
 
       {/* Pinterest Tab */}
       {tab === 'pinterest' && (
-        <div className="hud-panel">
+        <div className="hud-panel w-full">
           <h4 className="text-[10px] text-kaihara-muted mb-3">PINTEREST MEDIA</h4>
           <div className="flex gap-2 mb-3">
             <input value={pinQuery} onChange={e => setPinQuery(e.target.value)}
