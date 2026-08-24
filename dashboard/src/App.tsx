@@ -12,6 +12,7 @@ import SecurityView from './components/SecurityView'
 import DaemonView from './components/DaemonView'
 import PendingApprovals from './components/PendingApprovals'
 import MarketingDashboard from './components/MarketingDashboard'
+import SystemStatsWidget from './components/SystemStatsWidget'
 import ChannelStatus from './components/ChannelStatus'
 import KernelStatus from './components/KernelStatus'
 import MetaPanel from './components/MetaPanel'
@@ -190,6 +191,7 @@ export default function App() {
             onDelete={handleDeleteConv}
           />
           <KaiharaStatus thinking={thinking} online={!!status?.kaihara_online} />
+          <SystemStatsWidget />
           <ChannelStatus />
           <KernelStatus />
           <MetaPanel />

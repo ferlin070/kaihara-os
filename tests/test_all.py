@@ -504,11 +504,12 @@ async def test_health_agent():
     from core.os.health_agent import HealthAgent
     agent = HealthAgent({})
     result = await agent.run_once()
-    assert "cpu_percent" in result, "No CPU data"
+    assert "cpu" in result, "No CPU data"
     assert "ram" in result, "No RAM data"
-    print(f"    CPU: {result['cpu_percent']}%")
+    print(f"    CPU: {result['cpu']['percent']}%")
     print(f"    RAM: {result['ram']['percent']}%")
     print(f"    Disk: {result['disk']['percent']}%")
+    print(f"    Uptime: {result['uptime_seconds']}s")
     return True
 
 test("Health Agent reads system stats", test_health_agent)

@@ -71,6 +71,36 @@ def create_app(command_center) -> FastAPI:
             "docs": "/docs",
         }
 
+    @app.get("/api/system/stats")
+    async def system_stats():
+        """Live system stats: CPU, RAM, disk, network, processes."""
+        from core.tools.system_tools import get_system_stats
+        return get_system_stats()
+
+    @app.get("/api/system/network-speed")
+    async def system_network_speed():
+        """Run a quick network speed test."""
+        from core.tools.system_tools import get_network_speed
+        return get_network_speed()
+
+    @app.get("/api/system/bandwidth")
+    async def system_bandwidth():
+        """Get current bandwidth rate."""
+        from core.tools.system_tools import get_bandwidth_rate
+        return get_bandwidth_rate()
+
+    @app.get("/api/system/disks")
+    async def system_disks():
+        """Get all disk partitions."""
+        from core.tools.system_tools import get_disk_partitions
+        return {"partitions": get_disk_partitions()}
+
+    @app.get("/api/system/ping")
+    async def system_ping(host: str = "8.8.8.8"):
+        """Ping a host for latency."""
+        from core.tools.system_tools import ping_host
+        return ping_host(host)
+
     @app.get("/api/status")
     async def status():
         return command_center.status()

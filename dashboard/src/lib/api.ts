@@ -66,6 +66,46 @@ export async function getStatus(): Promise<SystemStatus> {
   return res.json()
 }
 
+// ============================================================
+// System Stats (live metrics)
+// ============================================================
+
+export interface SystemStats {
+  timestamp: string
+  system: { platform: string; hostname: string; python: string; uptime_seconds: number }
+  cpu: { percent: number; per_core: number[]; count_logical: number; count_physical: number; load_1m: number; load_5m: number; load_15m: number; freq_mhz: number | null }
+  memory: { ram_total_gb: number; ram_used_gb: number; ram_available_gb: number; ram_percent: number; swap_total_gb: number; swap_used_gb: number; swap_percent: number }
+  disk: { total_gb: number; used_gb: number; free_gb: number; percent: number; io: { read_mb: number; write_mb: number; read_count: number; write_count: number } | null }
+  network: { total_sent_mb: number; total_recv_mb: number; total_packets_sent: number; total_packets_recv: number; errin: number; errout: number; dropin: number; dropout: number; connections: number; established: number; interfaces: any[]; interface_status: any[] }
+  processes: { total: number; top_cpu: any[]; top_ram: any[] }
+  temperature: number | null
+}
+
+export async function getSystemStats(): Promise<SystemStats> {
+  const res = await fetch(`${API_BASE}/system/stats`)
+  return res.json()
+}
+
+export async function getNetworkSpeed(): Promise<any> {
+  const res = await fetch(`${API_BASE}/system/network-speed`)
+  return res.json()
+}
+
+export async function getBandwidthRate(): Promise<any> {
+  const res = await fetch(`${API_BASE}/system/bandwidth`)
+  return res.json()
+}
+
+export async function getDiskPartitions(): Promise<{ partitions: any[] }> {
+  const res = await fetch(`${API_BASE}/system/disks`)
+  return res.json()
+}
+
+export async function pingHost(host = '8.8.8.8'): Promise<any> {
+  const res = await fetch(`${API_BASE}/system/ping?host=${host}`)
+  return res.json()
+}
+
 export async function sendMessage(message: string, source = 'dashboard', convId?: string): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
