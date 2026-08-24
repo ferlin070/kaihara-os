@@ -1307,6 +1307,77 @@ export async function pinterestClearDownloads(): Promise<any> {
 }
 
 // ============================================================
+// AI Image Generation (Stable Diffusion local)
+// ============================================================
+
+export async function aiGenerateImage(prompt: string, opts: {
+  negative?: string; width?: number; height?: number;
+  steps?: number; seed?: number;
+} = {}): Promise<any> {
+  const res = await fetch(`${API_BASE}/ai/generate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, ...opts }),
+  })
+  return res.json()
+}
+
+export async function aiGeneratePoster(title: string, style = 'cinematic'): Promise<any> {
+  const res = await fetch(`${API_BASE}/ai/generate-poster`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, style }),
+  })
+  return res.json()
+}
+
+export async function aiGenerateThumbnail(topic: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/ai/generate-thumbnail`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic }),
+  })
+  return res.json()
+}
+
+export async function aiGenerateStatus(): Promise<any> {
+  const res = await fetch(`${API_BASE}/ai/status`)
+  return res.json()
+}
+
+// ============================================================
+// Google Flow (Imagen + Veo)
+// ============================================================
+
+export async function flowGenerateImage(prompt: string, model = 'imagen-4'): Promise<any> {
+  const res = await fetch(`${API_BASE}/flow/generate-image`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, model }),
+  })
+  return res.json()
+}
+
+export async function flowGenerateVideo(prompt: string, opts: {
+  model?: string; duration?: string; aspect_ratio?: string;
+} = {}): Promise<any> {
+  const res = await fetch(`${API_BASE}/flow/generate-video`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, ...opts }),
+  })
+  return res.json()
+}
+
+export async function flowImageToVideo(imagePath: string, prompt = ''): Promise<any> {
+  const res = await fetch(`${API_BASE}/flow/image-to-video`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_path: imagePath, prompt }),
+  })
+  return res.json()
+}
+
+export async function flowStatus(): Promise<any> {
+  const res = await fetch(`${API_BASE}/flow/status`)
+  return res.json()
+}
+
+// ============================================================
 // Meta Agent
 // ============================================================
 

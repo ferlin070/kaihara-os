@@ -36,6 +36,12 @@ Pillow>=10.0.0           # Image generation, resize, filter, composite
 MoviePy>=2.0.0           # Video slideshow with transitions
 edge-tts>=6.1.0          # Microsoft Edge Neural TTS (BM voices)
 
+# --- AI Image Generation (local) ---
+diffusers>=0.30.0        # Stable Diffusion text-to-image
+transformers>=4.40.0     # Required by diffusers
+accelerate>=0.30.0       # Required by diffusers
+torch>=2.0.0             # PyTorch backend
+
 # --- Stock Media ---
 # httpx already included above
 

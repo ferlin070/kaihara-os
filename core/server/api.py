@@ -2149,4 +2149,92 @@ Format as JSON with keys: title, body, hashtags, cta"""
             return {"error": "editor agent not ready"}
         return await editor._pinterest_clear_downloads()
 
+    # ============================================================
+    # AI IMAGE GENERATION (Stable Diffusion local)
+    # ============================================================
+
+    @app.post("/api/ai/generate")
+    async def ai_generate(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        prompt = payload.get("prompt", "")
+        return await editor._ai_generate_image(
+            prompt,
+            negative_prompt=payload.get("negative", ""),
+            width=payload.get("width", 512),
+            height=payload.get("height", 512),
+            steps=payload.get("steps", 30),
+            seed=payload.get("seed"),
+        )
+
+    @app.post("/api/ai/generate-poster")
+    async def ai_generate_poster(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        title = payload.get("title", "")
+        return await editor._ai_generate_poster(
+            title,
+            style=payload.get("style", "cinematic"),
+            prompt=payload.get("prompt", ""),
+        )
+
+    @app.post("/api/ai/generate-thumbnail")
+    async def ai_generate_thumbnail(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        topic = payload.get("topic", "")
+        return await editor._ai_generate_thumbnail(topic)
+
+    @app.get("/api/ai/status")
+    async def ai_status():
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._ai_generate_status()
+
+    # ============================================================
+    # GOOGLE FLOW (Imagen + Veo)
+    # ============================================================
+
+    @app.post("/api/flow/generate-image")
+    async def flow_generate_image(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        prompt = payload.get("prompt", "")
+        return await editor._google_flow_generate_image(
+            prompt, model=payload.get("model", "imagen-4"))
+
+    @app.post("/api/flow/generate-video")
+    async def flow_generate_video(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        prompt = payload.get("prompt", "")
+        return await editor._google_flow_generate_video(
+            prompt,
+            model=payload.get("model", "veo-3.1-fast"),
+            duration=payload.get("duration", "8s"),
+            aspect_ratio=payload.get("aspect_ratio", "16:9"),
+        )
+
+    @app.post("/api/flow/image-to-video")
+    async def flow_image_to_video(payload: dict):
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        image_path = payload.get("image_path", "")
+        return await editor._google_flow_image_to_video(
+            image_path, prompt=payload.get("prompt", ""))
+
+    @app.get("/api/flow/status")
+    async def flow_status():
+        editor = getattr(command_center, "editor_agent", None)
+        if not editor:
+            return {"error": "editor agent not ready"}
+        return await editor._google_flow_status()
+
     return app

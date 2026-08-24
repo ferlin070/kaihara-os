@@ -1091,7 +1091,9 @@ async def test_editor_agent():
                 "pinterest_search", "pinterest_download_pin",
                 "video_speed", "video_crop", "video_to_gif",
                 "video_color_grade", "video_remove_audio",
-                "video_add_voiceover", "get_curated_photos", "get_popular_videos"]
+                "video_add_voiceover", "get_curated_photos", "get_popular_videos",
+                "ai_generate_image", "ai_generate_poster",
+                "google_flow_generate_image", "google_flow_generate_video"]
     for t in expected:
         assert t in tools, f"Missing tool: {t}"
     print(f"    All expected tools present")
@@ -1140,6 +1142,36 @@ async def test_editor_run_method():
     return True
 
 test("Editor: run method", test_editor_run_method)
+
+async def test_ai_tools():
+    from core.tools.ai_tools import AIGenerateTools, AI_GENERATE_TOOLS
+    tools = AIGenerateTools()
+    assert len(AI_GENERATE_TOOLS) == 4, f"Expected 4 tools, got {len(AI_GENERATE_TOOLS)}"
+    tool_names = [t["name"] for t in AI_GENERATE_TOOLS]
+    assert "ai_generate_image" in tool_names
+    assert "ai_generate_poster" in tool_names
+    status = tools.status()
+    assert "diffusers_installed" in status
+    print(f"    AI tools: {len(AI_GENERATE_TOOLS)} — {tool_names}")
+    print(f"    AI status: diffusers={status['diffusers_installed']}, cuda={status['cuda_available']}")
+    return True
+
+test("AI image tools init", test_ai_tools)
+
+async def test_google_flow_tools():
+    from core.tools.google_flow_tools import GoogleFlowTools, GOOGLE_FLOW_TOOLS
+    tools = GoogleFlowTools()
+    assert len(GOOGLE_FLOW_TOOLS) == 4, f"Expected 4 tools, got {len(GOOGLE_FLOW_TOOLS)}"
+    tool_names = [t["name"] for t in GOOGLE_FLOW_TOOLS]
+    assert "google_flow_generate_image" in tool_names
+    assert "google_flow_generate_video" in tool_names
+    status = tools.status()
+    assert "token_set" in status
+    print(f"    Google Flow tools: {len(GOOGLE_FLOW_TOOLS)} — {tool_names}")
+    print(f"    Flow status: token={status['token_set']}")
+    return True
+
+test("Google Flow tools init", test_google_flow_tools)
 
 section("16. GDRIVE MEDIA TOOLS")
 

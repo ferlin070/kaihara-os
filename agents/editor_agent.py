@@ -26,6 +26,8 @@ from core.tools.image_tools import (
 )
 from core.tools.gdrive_tools import GDriveMediaTools
 from core.tools.pinterest_tools import PinterestTools
+from core.tools.ai_tools import AIGenerateTools
+from core.tools.google_flow_tools import GoogleFlowTools
 
 
 class EditorAgent(BaseAgent):
@@ -52,6 +54,10 @@ class EditorAgent(BaseAgent):
             remote_name=(config or {}).get("gdrive_remote", "gdrive")
         )
         self._pinterest = PinterestTools()
+        self._ai_gen = AIGenerateTools(media_dir=self.media_dir)
+        self._google_flow = GoogleFlowTools(
+            api_token=(config or {}).get("useapi_token", "")
+        )
         self._tts = None
         self._register_tools()
 
@@ -116,6 +122,16 @@ class EditorAgent(BaseAgent):
         # Pinterest
         elif any(w in task_lower for w in ["pinterest", "pin"]):
             result = await self._handle_pinterest_task(task, ctx)
+
+        # AI Image Generation
+        elif any(w in task_lower for w in ["generate image", "ai image", "ai gambar", "stable diffusion"]):
+            result = await self._handle_ai_image_task(task, ctx)
+        elif any(w in task_lower for w in ["ai poster", "ai thumbnail"]):
+            result = await self._handle_ai_poster_task(task, ctx)
+
+        # Google Flow
+        elif any(w in task_lower for w in ["google flow", "veo", "imagen", "ai video"]):
+            result = await self._handle_google_flow_task(task, ctx)
 
         # Probe/inspect
         elif any(w in task_lower for w in ["probe", "inspect", "info", "metadata"]):
@@ -279,6 +295,31 @@ class EditorAgent(BaseAgent):
         return await self._pinterest_search(query,
             limit=ctx.get("limit", 20))
 
+    async def _handle_ai_image_task(self, task: str, ctx: dict) -> dict:
+        prompt = ctx.get("prompt") or task
+        return await self._ai_generate_image(prompt,
+            negative_prompt=ctx.get("negative", ""),
+            width=ctx.get("width", 512),
+            height=ctx.get("height", 512),
+            steps=ctx.get("steps", 30),
+            seed=ctx.get("seed"))
+
+    async def _handle_ai_poster_task(self, task: str, ctx: dict) -> dict:
+        title = ctx.get("title") or task
+        return await self._ai_generate_poster(title,
+            style=ctx.get("style", "cinematic"),
+            prompt=ctx.get("prompt", ""))
+
+    async def _handle_google_flow_task(self, task: str, ctx: dict) -> dict:
+        prompt = ctx.get("prompt") or task
+        media_type = ctx.get("type", "image")
+        if media_type == "video" or any(w in task_lower for w in ["video", "veo"]):
+            return await self._google_flow_generate_video(prompt,
+                model=ctx.get("model", "veo-3.1-fast"),
+                duration=ctx.get("duration", "8s"))
+        return await self._google_flow_generate_image(prompt,
+            model=ctx.get("model", "imagen-4"))
+
     async def _handle_probe_task(self, task: str, ctx: dict) -> dict:
         path = ctx.get("input") or ctx.get("path")
         if not path:
@@ -352,6 +393,18 @@ class EditorAgent(BaseAgent):
         self.register_tool("pinterest_download_board", self._pinterest_download_board)
         self.register_tool("pinterest_list_downloads", self._pinterest_list_downloads)
         self.register_tool("pinterest_clear_downloads", self._pinterest_clear_downloads)
+
+        # AI Image Generation tools
+        self.register_tool("ai_generate_image", self._ai_generate_image)
+        self.register_tool("ai_generate_poster", self._ai_generate_poster)
+        self.register_tool("ai_generate_thumbnail", self._ai_generate_thumbnail)
+        self.register_tool("ai_generate_status", self._ai_generate_status)
+
+        # Google Flow tools
+        self.register_tool("google_flow_generate_image", self._google_flow_generate_image)
+        self.register_tool("google_flow_generate_video", self._google_flow_generate_video)
+        self.register_tool("google_flow_image_to_video", self._google_flow_image_to_video)
+        self.register_tool("google_flow_status", self._google_flow_status)
 
     # ---- Video Tools ----
 
@@ -695,6 +748,56 @@ class EditorAgent(BaseAgent):
 
     async def _pinterest_clear_downloads(self) -> dict:
         return self._pinterest.clear_downloads()
+
+    # ---- AI Image Generation Tools ----
+
+    async def _ai_generate_image(self, prompt: str, output_path: str = None,
+                                  negative_prompt: str = "",
+                                  width: int = 512, height: int = 512,
+                                  steps: int = 30, guidance_scale: float = 7.5,
+                                  seed: int = None) -> dict:
+        return self._ai_gen.generate_image(prompt, output_path,
+            negative_prompt=negative_prompt, width=width, height=height,
+            steps=steps, guidance_scale=guidance_scale, seed=seed)
+
+    async def _ai_generate_poster(self, title: str, output_path: str = None,
+                                   style: str = "cinematic",
+                                   prompt: str = "") -> dict:
+        return self._ai_gen.generate_poster_ai(title, style, output_path,
+            prompt=prompt)
+
+    async def _ai_generate_thumbnail(self, topic: str,
+                                      output_path: str = None) -> dict:
+        return self._ai_gen.generate_thumbnail_ai(topic, output_path)
+
+    async def _ai_generate_status(self) -> dict:
+        return self._ai_gen.status()
+
+    # ---- Google Flow Tools ----
+
+    async def _google_flow_generate_image(self, prompt: str,
+                                           output_path: str = None,
+                                           model: str = "imagen-4") -> dict:
+        return self._google_flow.generate_image(prompt, model=model,
+            output_path=output_path)
+
+    async def _google_flow_generate_video(self, prompt: str,
+                                           output_path: str = None,
+                                           model: str = "veo-3.1-fast",
+                                           duration: str = "8s",
+                                           aspect_ratio: str = "16:9") -> dict:
+        return self._google_flow.generate_video(prompt, model=model,
+            duration=duration, aspect_ratio=aspect_ratio,
+            output_path=output_path)
+
+    async def _google_flow_image_to_video(self, image_path: str,
+                                           prompt: str = "",
+                                           output_path: str = None) -> dict:
+        return self._google_flow.generate_video_from_image(image_path,
+            prompt=prompt, output_path=output_path)
+
+    async def _google_flow_status(self) -> dict:
+        return self._google_flow.status()
 
     # ---- Background Task ----
 

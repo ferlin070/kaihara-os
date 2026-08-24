@@ -9,9 +9,11 @@ import {
   pinterestSearch, pinterestSearchImages, pinterestSearchVideos,
   pinterestDownloadPin, pinterestDownloadBoard, pinterestListDownloads,
   pinterestClearDownloads,
+  aiGenerateImage, aiGeneratePoster, aiGenerateStatus,
+  flowGenerateImage, flowGenerateVideo, flowStatus,
 } from '../lib/api'
 
-type Tab = 'poster' | 'banner' | 'social' | 'stock' | 'video' | 'probe' | 'gdrive' | 'pinterest'
+type Tab = 'poster' | 'banner' | 'social' | 'stock' | 'video' | 'probe' | 'gdrive' | 'pinterest' | 'ai_gen' | 'google_flow'
 
 export default function EditorView() {
   const [tab, setTab] = useState<Tab>('poster')
@@ -60,6 +62,18 @@ export default function EditorView() {
   const [pinType, setPinType] = useState<'all' | 'images' | 'videos'>('all')
   const [pinResults, setPinResults] = useState<any[]>([])
   const [pinDownloads, setPinDownloads] = useState<any[]>([])
+
+  // AI Generate
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiStyle, setAiStyle] = useState('cinematic')
+  const [aiResult, setAiResult] = useState<any>(null)
+  const [aiStatus, setAiStatus] = useState<any>(null)
+
+  // Google Flow
+  const [flowPrompt, setFlowPrompt] = useState('')
+  const [flowType, setFlowType] = useState<'image' | 'video'>('image')
+  const [flowResult, setFlowResult] = useState<any>(null)
+  const [flowStatus, setFlowStatus] = useState<any>(null)
 
   const handleGenerate = useCallback(async (fn: () => Promise<any>) => {
     setLoading(true)
@@ -189,6 +203,59 @@ export default function EditorView() {
     setLoading(false)
   }, [])
 
+  const handleAiGenerate = useCallback(async () => {
+    if (!aiPrompt) return
+    setLoading(true)
+    setError('')
+    setAiResult(null)
+    try {
+      const r = await aiGeneratePoster(aiPrompt, aiStyle)
+      setAiResult(r)
+      if (!r.ok) setError(r.error || 'Generation failed')
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [aiPrompt, aiStyle])
+
+  const handleAiStatus = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await aiGenerateStatus()
+      setAiStatus(r)
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [])
+
+  const handleFlowGenerate = useCallback(async () => {
+    if (!flowPrompt) return
+    setLoading(true)
+    setError('')
+    setFlowResult(null)
+    try {
+      const fn = flowType === 'video' ? flowGenerateVideo : flowGenerateImage
+      const r = await fn(flowPrompt)
+      setFlowResult(r)
+      if (!r.ok) setError(r.error || 'Generation failed')
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [flowPrompt, flowType])
+
+  const handleFlowStatus = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await flowStatus()
+      setFlowStatus(r)
+    } catch (e) {
+      setError(String(e))
+    }
+    setLoading(false)
+  }, [])
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'poster', label: 'Poster' },
     { id: 'banner', label: 'Banner' },
@@ -198,6 +265,8 @@ export default function EditorView() {
     { id: 'probe', label: 'Probe' },
     { id: 'gdrive', label: 'GDrive' },
     { id: 'pinterest', label: 'Pinterest' },
+    { id: 'ai_gen', label: 'AI Gen' },
+    { id: 'google_flow', label: 'Flow' },
   ]
 
   return (
@@ -537,6 +606,95 @@ export default function EditorView() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* AI Generation Tab */}
+      {tab === 'ai_gen' && (
+        <div className="hud-panel">
+          <h4 className="text-[10px] text-kaihara-muted mb-3">AI IMAGE GENERATION (Stable Diffusion)</h4>
+          <div className="flex gap-2 mb-3">
+            <input value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}
+              className="kaihara-input flex-1 text-xs" placeholder="Describe image to generate..."
+              onKeyDown={e => e.key === 'Enter' && handleAiGenerate()} />
+            <select value={aiStyle} onChange={e => setAiStyle(e.target.value)}
+              className="kaihara-input text-xs w-28">
+              <option value="cinematic">Cinematic</option>
+              <option value="anime">Anime</option>
+              <option value="realistic">Realistic</option>
+              <option value="fantasy">Fantasy</option>
+              <option value="minimalist">Minimalist</option>
+              <option value="retro">Retro</option>
+            </select>
+            <button onClick={handleAiGenerate} disabled={loading}
+              className="kaihara-btn text-xs px-3">
+              {loading ? 'Generating...' : 'Generate'}
+            </button>
+          </div>
+          <button onClick={handleAiStatus} disabled={loading}
+            className="kaihara-btn text-xs px-3 mb-3">
+            Check Status
+          </button>
+          {aiStatus && (
+            <div className="text-[10px] text-kaihara-muted mb-2">
+              Diffusers: {aiStatus.diffusers_installed ? '✓' : '✗'} |
+              CUDA: {aiStatus.cuda_available ? '✓' : '✗'} |
+              Device: {aiStatus.device}
+            </div>
+          )}
+          {aiResult && (
+            <div className="mt-2 p-2 bg-black/20 rounded text-[10px]">
+              {aiResult.ok ? (
+                <div className="text-kaihara-success">
+                  ✓ Generated: {aiResult.output}
+                </div>
+              ) : (
+                <div className="text-kaihara-danger">{aiResult.error}</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Google Flow Tab */}
+      {tab === 'google_flow' && (
+        <div className="hud-panel">
+          <h4 className="text-[10px] text-kaihara-muted mb-3">GOOGLE FLOW (Imagen + Veo)</h4>
+          <div className="flex gap-2 mb-3">
+            <input value={flowPrompt} onChange={e => setFlowPrompt(e.target.value)}
+              className="kaihara-input flex-1 text-xs" placeholder="Describe content to generate..."
+              onKeyDown={e => e.key === 'Enter' && handleFlowGenerate()} />
+            <select value={flowType} onChange={e => setFlowType(e.target.value as any)}
+              className="kaihara-input text-xs w-24">
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+            </select>
+            <button onClick={handleFlowGenerate} disabled={loading}
+              className="kaihara-btn text-xs px-3">
+              {loading ? 'Generating...' : 'Generate'}
+            </button>
+          </div>
+          <button onClick={handleFlowStatus} disabled={loading}
+            className="kaihara-btn text-xs px-3 mb-3">
+            Check Status
+          </button>
+          {flowStatus && (
+            <div className="text-[10px] text-kaihara-muted mb-2">
+              Token: {flowStatus.token_set ? '✓' : '✗'} |
+              httpx: {flowStatus.httpx_installed ? '✓' : '✗'}
+            </div>
+          )}
+          {flowResult && (
+            <div className="mt-2 p-2 bg-black/20 rounded text-[10px]">
+              {flowResult.ok ? (
+                <div className="text-kaihara-success">
+                  ✓ Generated: {flowResult.output || 'check media folder'}
+                </div>
+              ) : (
+                <div className="text-kaihara-danger">{flowResult.error}</div>
+              )}
             </div>
           )}
         </div>
