@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import LandingPages from './LandingPages'
 import {
   getDeployStatus, getDockerPs, dockerCompose, getDockerLogs,
   getGitStatus, gitPullDeploy, gitDeploy, gitRollback,
@@ -90,6 +91,8 @@ export default function DeployView() {
       <h2 className="text-sm font-bold text-kaihara-text flex items-center gap-2">
         <span className="text-kaihara-accent">🚀</span> Deploy Agent
       </h2>
+
+      <LandingPages />
 
       {/* Health + Disk + Git */}
       <div className="grid grid-cols-3 gap-3">
