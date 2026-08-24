@@ -16,7 +16,6 @@ import SystemStatsWidget from './components/SystemStatsWidget'
 import DeployView from './components/DeployView'
 import EditorView from './components/EditorView'
 import WorkflowDashboard from './components/WorkflowDashboard'
-import ChannelStatus from './components/ChannelStatus'
 import KernelStatus from './components/KernelStatus'
 import MetaPanel from './components/MetaPanel'
 import AgentMap from './components/AgentMap'
@@ -199,7 +198,8 @@ export default function App() {
           <div className="p-3 space-y-2">
             <KaiharaStatus thinking={thinking} online={!!status?.kaihara_online} />
             <SystemStatsWidget />
-            <ChannelStatus />
+            <KernelStatus />
+            <MetaPanel />
           </div>
         </div>
       </aside>
@@ -220,10 +220,6 @@ export default function App() {
                 Offline
               </span>
             )}
-          </div>
-          <div className="flex items-center gap-3">
-            <KernelStatus />
-            <MetaPanel />
           </div>
         </header>
 
