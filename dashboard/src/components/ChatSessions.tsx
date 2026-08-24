@@ -1,6 +1,7 @@
 import {
   type Conversation,
 } from '../lib/api'
+import { useState } from 'react'
 
 export default function ChatSessions({
   conversations,
@@ -17,6 +18,11 @@ export default function ChatSessions({
   onRename: (id: string) => void
   onDelete: (id: string) => void
 }) {
+  const [open, setOpen] = useState(false)
+
+  const active = conversations.find(c => c.conv_id === activeConvId)
+  const activeTitle = active?.title || 'Current Chat'
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -30,45 +36,55 @@ export default function ChatSessions({
         </button>
       </div>
 
-      <div className="space-y-1">
-        {conversations.length === 0 && (
-          <p className="text-xs text-kaihara-muted py-2 text-center">No saved chats.</p>
-        )}
-        {conversations.map(c => (
-          <div
-            key={c.conv_id}
-            className={`group flex items-center rounded-lg text-xs ${
-              c.conv_id === activeConvId 
-                ? 'bg-kaihara-primary/10 border border-kaihara-primary/30' 
-                : 'hover:bg-kaihara-surface border border-transparent'
-            }`}
-          >
-            <button
-              onClick={() => onSelect(c.conv_id)}
-              className="flex-1 text-left px-3 py-2 truncate min-w-0"
-              title={c.title}
+      {/* Active chat name — click to toggle list */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between text-xs text-left px-2 py-1.5 rounded bg-kaihara-bg border border-kaihara-border hover:border-kaihara-accent transition-colors"
+      >
+        <span className="truncate">{activeTitle}</span>
+        <span className="text-kaihara-muted ml-2">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {/* Conversation list */}
+      {open && (
+        <div className="space-y-0.5">
+          {conversations.length === 0 && (
+            <p className="text-xs text-kaihara-muted px-2 py-1">No saved chats.</p>
+          )}
+          {conversations.map(c => (
+            <div
+              key={c.conv_id}
+              className={`group flex items-center rounded text-xs ${
+                c.conv_id === activeConvId ? 'bg-kaihara-accent/20' : 'hover:bg-kaihara-border/50'
+              }`}
             >
-              <span className="block truncate font-medium">{c.title}</span>
-              <span className="block text-[10px] text-kaihara-muted mt-0.5">
-                {c.message_count} msgs
-              </span>
-            </button>
-            <div className="relative flex-shrink-0 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const action = prompt('Rename or delete? (r/d)')
-                  if (action === 'r') onRename(c.conv_id)
-                  else if (action === 'd') onDelete(c.conv_id)
-                }}
-                className="p-1 text-kaihara-muted hover:text-kaihara-text rounded"
+                onClick={() => { onSelect(c.conv_id); setOpen(false) }}
+                className="flex-1 text-left px-2 py-1.5 truncate min-w-0"
+                title={c.title}
               >
-                ⋮
+                <span className="block truncate">{c.title}</span>
+                <span className="block text-[10px] text-kaihara-muted">
+                  {c.message_count} msgs
+                </span>
               </button>
+              <div className="relative flex-shrink-0 pr-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const action = prompt('Rename or delete? (r/d)')
+                    if (action === 'r') onRename(c.conv_id)
+                    else if (action === 'd') onDelete(c.conv_id)
+                  }}
+                  className="px-1.5 py-1 text-kaihara-muted hover:text-kaihara-text"
+                >
+                  ⋮
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

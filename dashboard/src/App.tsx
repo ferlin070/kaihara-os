@@ -196,7 +196,7 @@ function AppContent() {
         </div>
 
         {/* Chat Sessions — scroll */}
-        <div className="flex-1 overflow-y-auto p-3 min-h-0">
+        <div className="overflow-y-auto p-3 min-h-0 flex-shrink-0">
           <ChatSessions
             conversations={conversations}
             activeConvId={activeConvId}
@@ -207,8 +207,8 @@ function AppContent() {
           />
         </div>
 
-        {/* Status — scroll, limited height */}
-        <div className="border-t border-kaihara-border overflow-y-auto max-h-48 flex-shrink-0">
+        {/* Status — fills remaining space, scroll */}
+        <div className="flex-1 border-t border-kaihara-border overflow-y-auto min-h-0">
           <div className="p-3 space-y-2">
             <KaiharaStatus thinking={thinking} online={!!status?.kaihara_online} />
             <SystemStatsWidget />
