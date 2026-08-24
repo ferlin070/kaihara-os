@@ -8,6 +8,7 @@ import asyncio
 import email
 from email.mime.text import MIMEText
 from typing import Any
+import os
 
 from core.channels.base import BaseChannel
 
@@ -19,12 +20,16 @@ class EmailChannel(BaseChannel):
 
     def __init__(self, config: dict, command_center=None):
         super().__init__(config, command_center)
-        self.smtp_host = config.get("smtp_host", "")
+        self.smtp_host = config.get("smtp_host") or os.environ.get(
+            "SMTP_HOST", "")
         self.smtp_port = config.get("smtp_port", 587)
-        self.imap_host = config.get("imap_host", "")
+        self.imap_host = config.get("imap_host") or os.environ.get(
+            "IMAP_HOST", "")
         self.imap_port = config.get("imap_port", 993)
-        self.username = config.get("username", "")
-        self.password = config.get("password", "")
+        self.username = (config.get("username") or
+                         os.environ.get("EMAIL_USERNAME", ""))
+        self.password = (config.get("password") or
+                         os.environ.get("EMAIL_PASSWORD", ""))
         self._poll_task = None
         self._poll_interval = 30
 
@@ -89,6 +94,15 @@ class EmailChannel(BaseChannel):
             return {"status": "sent", "recipient": recipient}
         except Exception as e:
             return {"error": str(e)}
+
+    def _parse_inbound(self, raw: dict | email.message.Message) -> dict | None:
+        if isinstance(raw, dict):
+            return {
+                "sender": raw.get("from", ""),
+                "text": raw.get("text", ""),
+                "conv_id": f"email_{raw.get('from', 'unknown')}",
+            }
+        return self._parse_email_impl(raw)
 
     def _parse_email(self, msg: email.message.Message) -> dict | None:
         sender = msg.get("From", "")
