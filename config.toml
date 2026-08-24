@@ -241,3 +241,28 @@ user_data_dir = "./data/chrome-profile"
 default_style = "default"
 default_aspect_ratio = "16:9"
 max_batch_size = 10
+
+# ============================================================
+#  COMFYUI (Local AI Image Generation)
+# ============================================================
+
+[comfyui]
+enabled = false
+url = "http://127.0.0.1:8188"
+output_dir = "./data/media/comfyui"
+
+[comfyui.generation]
+default_checkpoint = "v1-5-pruned-emaonly.safetensors"
+default_steps = 30
+default_cfg = 7.0
+default_size = [512, 512]
+
+# ============================================================
+#  STABLE DIFFUSION (Local via diffusers)
+# ============================================================
+
+[stable_diffusion]
+enabled = false
+model = "stable-diffusion-v1-5/stable-diffusion-v1-5"
+device = "auto"  # auto, cuda, cpu
+output_dir = "./data/media/ai_gen"
