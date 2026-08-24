@@ -226,3 +226,18 @@ default_niche = "restoran"
 default_location = "Johor Bahru"
 default_channel = "email"
 lead_scoring_threshold = 50
+
+# ============================================================
+#  GOOGLE FLOW MCP (AI Image/Video Generation)
+# ============================================================
+
+[google_flow]
+enabled = true
+headless = false
+timeout = 60000
+user_data_dir = "./data/chrome-profile"
+
+[google_flow.generation]
+default_style = "default"
+default_aspect_ratio = "16:9"
+max_batch_size = 10
