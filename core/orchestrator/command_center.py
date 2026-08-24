@@ -4,11 +4,23 @@ The brain of Kaihara OS.
 """
 
 import asyncio
+import re
 from typing import Any
 
 from agents.base_agent import BaseAgent
 from core.orchestrator.model_router import ModelRouter
 from core.orchestrator.intent_parser import IntentParser
+
+
+TELEGRAM_CONV_PREFIX = "telegram_"
+TG_SEND_TRIGGER = re.compile(
+    r"\b(hantar|mesej|message|notify|bagitahu|send|inform)\b"
+    r"[^\n]{0,50}\btelegram\b|\btelegram\b[^\n]{0,50}"
+    r"(terus|hantar|send|bagi|ke\s+saya)", re.IGNORECASE)
+
+
+def _is_telegram_conv(conv_id: str) -> bool:
+    return str(conv_id).startswith(TELEGRAM_CONV_PREFIX)
 
 
 class SplitBrain:
@@ -182,6 +194,37 @@ class CommandCenter:
             context = ""
 
         intent = await self.intent_parser.parse(message)
+
+        # Telegram direct-send: explicit request from non-telegram source
+        tg_sent = False
+        if (source != "telegram" and not _is_telegram_conv(conv_id)
+                and TG_SEND_TRIGGER.search(message)):
+            try:
+                from core.tools.notify_tools import (
+                    send_telegram_message, telegram_status)
+                st = telegram_status()
+                if st.get("configured"):
+                    tg = send_telegram_message(f"Kaihara: {message}")
+                    if tg.get("ok"):
+                        ids = ", ".join(
+                            str(d["chat_id"]) for d in tg["details"])
+                        response_text = (
+                            f"✅ **Hantar ke Telegram berjaya!**\n\n"
+                            f"Mesej: \"{message}\"\n"
+                            f"Bot: {st.get('bot_username')}\n"
+                            f"Chat ID: {ids}")
+                        self.memory.store(response_text, source=source,
+                                          agent="kaihara")
+                        self.memory.add_context(conv_id, "assistant",
+                                                response_text)
+                        return {
+                            "source": source, "route": "telegram_send",
+                            "response": response_text, "intent": intent,
+                            "cached": False, "tokens_saved": 0,
+                        }
+            except Exception:
+                pass  # fall through to normal routing
+
         route = await self.split_brain.decide(intent)
 
         if cache_check.get("should_skip") and route != "reflex":

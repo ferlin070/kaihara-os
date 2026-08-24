@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from core.tools.web_tools import web_search, scrape_website, search_places
+from core.tools.notify_tools import send_telegram_message, telegram_status
 
 # Tasks matching these patterns get live web data injected
 WEB_TRIGGER = re.compile(
@@ -18,6 +19,12 @@ WEB_TRIGGER = re.compile(
     r"business|syarikat|company|pasaran|market|pesaing|competitor|"
     r"berita|news|harga|price|trend|review|google maps|maps)\b", re.I)
 WEB_AGENTS = {"marketing", "research", "kaihara"}
+
+# Telegram / notification triggers
+TG_TRIGGER = re.compile(
+    r"\b(hantar|mesej|message|notify|notification|bagitahu|inform)"
+    r"[^\n]{0,40}\btelegram\b|\btelegram\b[^\n]{0,40}\b"
+    r"(hantar|mesej|message|notify|bagitahu)\b", re.I | re.S)
 
 
 class BaseAgent:
@@ -242,6 +249,31 @@ class GenericAgent(BaseAgent):
 
             full_context = "\n\n".join(
                 x for x in (skill_context, memory_context, web_context) if x)
+
+            # Telegram send: execute directly when explicitly requested
+            if TG_TRIGGER.search(task):
+                st = telegram_status()
+                if st.get("configured"):
+                    tg_result = send_telegram_message(f"Kaihara: {task}")
+                    if tg_result.get("ok"):
+                        chat_ids = ", ".join(
+                            str(d["chat_id"]) for d in tg_result["details"])
+                        response_text = (
+                            f"✅ Mesej dihantar ke Telegram "
+                            f"({st.get('bot_username', 'bot')}):\n\n"
+                            f"\"{task}\"\n\nDihantar ke chat ID: {chat_ids}")
+                        if self.memory:
+                            self.memory.store(
+                                f"Telegram sent: {task[:80]}",
+                                source="agent", agent=self.AGENT_TYPE)
+                        return {
+                            "agent": self.AGENT_TYPE,
+                            "text": response_text,
+                            "telegram": tg_result,
+                            "status": "ok",
+                        }
+                    full_context += ("\n\n[TELEGRAM ERROR] Gagal hantar: "
+                                     + str(tg_result))
 
             # Use think() which applies SOUL.md as system prompt
             response = await self.think(task, context=full_context)

@@ -161,7 +161,7 @@ audit_log = "./data/audit.log"
 # ============================================================
 
 [channel.telegram]
-enabled = true
+enabled = false
 allowed_chat_ids = ["8275355102"]
 
 [channel.whatsapp]
