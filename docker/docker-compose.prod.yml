@@ -1,0 +1,86 @@
+# ============================================================
+#  KAIHARA OS — Production Docker Compose (nakhodacloud.top)
+# ============================================================
+#  Usage: docker compose -f docker-compose.prod.yml up -d
+# ============================================================
+
+services:
+  # --- Kaihara Core (API + Command Center) ---
+  kaihara-core:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.core
+    container_name: kaihara-core
+    ports:
+      - "127.0.0.1:7000:7000"
+    environment:
+      - ROOTSYS_API_KEY=${ROOTSYS_API_KEY}
+      - PYTHONPATH=/app
+      - KAIHARA_ENV=production
+    volumes:
+      - kaihara-data:/app/data
+      - kaihara-vault:/app/obsidian-vault
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --- Dashboard (nginx serving React build) ---
+  kaihara-dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: kaihara-dashboard
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      kaihara-core:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+  # --- Traefik Reverse Proxy ---
+  traefik:
+    image: traefik:v3.0
+    container_name: kaihara-traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=kaihara@nakhodacloud.top"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - letsencrypt:/letsencrypt
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+  # --- SearXNG (free web search) ---
+  searxng:
+    image: searxng/searxng:latest
+    container_name: kaihara-searxng
+    ports:
+      - "127.0.0.1:8888:8080"
+    restart: unless-stopped
+    networks:
+      - kaihara-net
+
+volumes:
+  kaihara-data:
+  kaihara-vault:
+  letsencrypt:
+
+networks:
+  kaihara-net:
+    driver: bridge
