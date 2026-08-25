@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from core.tools.web_tools import web_search, scrape_website, search_places
-from core.tools.notify_tools import send_telegram_message, telegram_status
+from core.tools.pdf_generator import generate_pdf_report
+from core.tools.notify_tools import send_telegram_message, send_telegram_document, telegram_status
 
 # Tasks matching these patterns get live web data injected
 WEB_TRIGGER = re.compile(
@@ -19,6 +20,11 @@ WEB_TRIGGER = re.compile(
     r"business|syarikat|company|pasaran|market|pesaing|competitor|"
     r"berita|news|harga|price|trend|review|google maps|maps)\b", re.I)
 WEB_AGENTS = {"marketing", "research", "kaihara"}
+
+# PDF / report triggers
+PDF_TRIGGER = re.compile(
+    r"\b(pdf|report|laporan|dokumen|document|Invoice|resume|borang|form)\b", re.I)
+PDF_AGENTS = {"kaihara", "marketing", "research"}
 
 # Telegram / notification triggers
 TG_TRIGGER = re.compile(
@@ -276,8 +282,39 @@ class GenericAgent(BaseAgent):
                     full_context += ("\n\n[TELEGRAM ERROR] Gagal hantar: "
                                      + str(tg_result))
 
+
             # Use think() which applies SOUL.md as system prompt
             response = await self.think(task, context=full_context)
+
+
+            # PDF generation: generate report and send to Telegram
+            if PDF_TRIGGER.search(task) and self.AGENT_TYPE in PDF_AGENTS:
+                try:
+                    from core.tools.pdf_generator import generate_pdf_report
+                    pdf_path = generate_pdf_report(
+                        title=task[:60],
+                        content=[
+                            {"type": "paragraph", "text": response},
+                        ],
+                        output_filename=f"report_{self.AGENT_TYPE}"
+                    )
+                    # Send to Telegram
+                    tg_status = telegram_status()
+                    if tg_status.get("configured"):
+                        doc_result = send_telegram_document(
+                            file_path=pdf_path,
+                            caption=f"📊 Laporan: {task[:100]}"
+                        )
+                        if doc_result.get("ok"):
+                            return {
+                                "agent": self.AGENT_TYPE,
+                                "text": f"✅ PDF telah dijana dan dihantar ke Telegram:\n{pdf_path}",
+                                "pdf_path": pdf_path,
+                                "telegram": doc_result,
+                                "status": "ok",
+                            }
+                except Exception as e:
+                    full_context += f"\n[PDF ERROR] {str(e)}"
 
             # Store result in memory
             if self.memory:
