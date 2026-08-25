@@ -54,7 +54,8 @@ class ModelRouter:
         return self.default
 
     async def complete(self, system: str, messages: list[dict],
-                       model: str | None = None) -> str:
+                       model: str | None = None,
+                       max_tokens: int = 4096) -> str:
         """Send completion request with automatic fallback.
 
         Chain: requested/primary -> fallback_chain -> always ends with local.
@@ -75,7 +76,7 @@ class ModelRouter:
             if not self._check_privacy(provider):
                 continue
             result, ok = await self._attempt(provider, model_name,
-                                             system, messages)
+                                             system, messages, max_tokens)
             if ok:
                 self.last_provider = f"{provider}/{model_name}"
                 input_tokens = sum(len(m.get("content", "")) // 4
@@ -89,7 +90,8 @@ class ModelRouter:
         return f"[All providers failed — last error: {last_error}]"
 
     async def _attempt(self, provider: str, model_name: str,
-                       system: str, messages: list[dict]) -> tuple[str, bool]:
+                       system: str, messages: list[dict],
+                       max_tokens: int = 4096) -> tuple[str, bool]:
         """Try one provider. Returns (text, success)."""
         provider_config = self._get_provider_config(provider)
         base_url = provider_config.get("base_url")
@@ -100,7 +102,7 @@ class ModelRouter:
         if is_local:
             text = await self._call_ollama(
                 base_url or "http://localhost:11434",
-                model_name, system, messages
+                model_name, system, messages, max_tokens
             )
             ok = not text.startswith("[Ollama not running") \
                  and not text.startswith("[Error:")
@@ -111,7 +113,7 @@ class ModelRouter:
         text = await self._call_openai_compat(
             base_url or "https://api.openai.com/v1",
             api_key, model_name, system, messages,
-            api_key_header
+            api_key_header, max_tokens
         )
         ok = not text.startswith("[API Error") \
              and not text.startswith("[Error:") \
@@ -148,16 +150,21 @@ class ModelRouter:
         return os.environ.get(env_var)
 
     async def _call_ollama(self, base_url: str, model: str,
-                           system: str, messages: list[dict]) -> str:
+                           system: str, messages: list[dict],
+                           max_tokens: int = 4096) -> str:
         # Normalize: support both bare host and /v1-suffixed URLs
         clean = base_url.rstrip("/")
         if clean.endswith("/v1"):
             clean = clean[:-3]
         url = f"{clean}/api/chat"
+        # Truncate system prompt to prevent token explosion
+        if len(system) > 8000:
+            system = system[:8000] + "\n[SYSTEM TRUNCATED]"
         payload = {
             "model": model,
             "messages": [{"role": "system", "content": system}] + messages,
             "stream": False,
+            "options": {"num_predict": max_tokens},
         }
         try:
             async with httpx.AsyncClient(timeout=120) as client:
@@ -176,17 +183,22 @@ class ModelRouter:
     async def _call_openai_compat(self, base_url: str, api_key: str | None,
                                    model: str, system: str,
                                    messages: list[dict],
-                                   api_key_header: str = "Authorization") -> str:
+                                   api_key_header: str = "Authorization",
+                                   max_tokens: int = 4096) -> str:
         url = f"{base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         if api_key_header.lower() == "authorization":
             headers["Authorization"] = f"Bearer {api_key}"
         else:
             headers[api_key_header] = api_key
+        # Truncate system prompt to prevent token explosion
+        if len(system) > 8000:
+            system = system[:8000] + "\n[SYSTEM TRUNCATED]"
         payload = {
             "model": model,
             "messages": [{"role": "system", "content": system}] + messages,
             "stream": False,
+            "options": {"num_predict": max_tokens},
         }
         try:
             async with httpx.AsyncClient(timeout=120) as client:

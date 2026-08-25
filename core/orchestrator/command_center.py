@@ -328,8 +328,10 @@ class CommandCenter:
             history = self.memory.get_context(conv_id)
             if history:
                 conv_history = "\n".join(
-                    f"{m['role']}: {m['content']}" for m in history[-10:]
+                    f"{m['role']}: {m['content'][:200]}" for m in history[-5:]
                 )
+                if len(conv_history) > 2000:
+                    conv_history = conv_history[-2000:]
         prompt = message
         if conv_history:
             prompt = f"Conversation history:\n{conv_history}\n\nUser: {message}"

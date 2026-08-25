@@ -202,7 +202,10 @@ class GenericAgent(BaseAgent):
                         in_section = False
 
                 if key_sections:
-                    contents.append(f"[SKILL: {skill_id}]\n" + "\n".join(key_sections[:30]))
+                    skill_text = "\n".join(key_sections[:20])
+                    if len(skill_text) > 2000:
+                        skill_text = skill_text[:2000] + "\n[SKILL TRUNCATED]"
+                    contents.append(f"[SKILL: {skill_id}]\n" + skill_text)
 
         return "\n\n".join(contents)
 
@@ -255,6 +258,9 @@ class GenericAgent(BaseAgent):
 
             full_context = "\n\n".join(
                 x for x in (skill_context, memory_context, web_context) if x)
+            # Hard cap on context to prevent token explosion
+            if len(full_context) > 6000:
+                full_context = full_context[:6000] + "\n[CONTEXT TRUNCATED]"
 
             # Telegram send: only for pure messaging tasks (skip if PDF requested)
             # Research/web tasks: skip (CommandCenter delivers final answer)
