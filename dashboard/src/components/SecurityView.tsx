@@ -420,7 +420,7 @@ function Approvals() {
     } catch {}
   }, [])
 
-  useEffect(() => { fetch(); const i = setInterval(fetch, 5000); return () => clearInterval(i) }, [fetch])
+  useEffect(() => { fetch(); const i = setInterval(fetch, 15000); return () => clearInterval(i) }, [fetch])
 
   const [creatingDemo, setCreatingDemo] = useState(false)
   const handleApprove = async (id: string) => { await approveAction(id); fetch() }

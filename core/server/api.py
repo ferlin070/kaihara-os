@@ -1926,6 +1926,68 @@ Format as JSON with keys: title, body, hashtags, cta"""
     # Meta Agent endpoints
     # ============================================================
 
+
+    @app.get("/api/dashboard/status")
+    async def dashboard_status():
+        """Combined endpoint: returns all dashboard sidebar data in ONE call."""
+        import psutil, time
+        from core.tools.system_tools import get_system_stats
+
+        result = {"timestamp": time.time()}
+
+        # System stats (CPU, RAM, disk)
+        try:
+            result["system"] = get_system_stats()
+        except:
+            result["system"] = {}
+
+        # Kernel agents status
+        try:
+            kernel = getattr(command_center, "_kernel", None)
+            if kernel:
+                agents = {}
+                for name, agent in kernel.agents.items():
+                    agents[name] = {
+                        "status": getattr(agent, "status", "idle"),
+                        "speech": getattr(agent, "speech", ""),
+                    }
+                result["kernel"] = agents
+            else:
+                result["kernel"] = {}
+        except:
+            result["kernel"] = {}
+
+        # Channels status
+        try:
+            channels = {}
+            mgr = getattr(command_center, "_channel_manager", None)
+            if mgr:
+                result["channels"] = mgr.status()
+            else:
+                result["channels"] = {}
+            result["channels"] = channels
+        except:
+            result["channels"] = {}
+
+        # Meta agent observations
+        try:
+            meta = getattr(command_center, "_meta_agent", None)
+            if meta:
+                result["meta"] = {
+                    "patterns": len(getattr(meta, "patterns", [])),
+                    "suggestions": len(getattr(meta, "suggestions", [])),
+                }
+            else:
+                result["meta"] = {}
+        except:
+            result["meta"] = {}
+
+        # Online status
+        result["kaihara_online"] = True
+
+        return result
+
+
     @app.get("/api/meta/status")
     async def meta_status():
         meta = getattr(command_center, "_meta_agent", None)

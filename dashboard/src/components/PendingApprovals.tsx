@@ -14,7 +14,7 @@ export default function PendingApprovals() {
       }
     }
     fetchApprovals()
-    const interval = setInterval(fetchApprovals, 15000) // Check every 15s
+    const interval = setInterval(fetchApprovals, 30000) // Check every 15s
     return () => clearInterval(interval)
   }, [])
 

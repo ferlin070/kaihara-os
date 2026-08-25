@@ -50,7 +50,7 @@ export default function SystemStatsWidget() {
 
   useEffect(() => {
     fetchStats()
-    const interval = setInterval(fetchStats, 3000) // Refresh every 3s
+    const interval = setInterval(fetchStats, 30000) // Refresh every 3s
     return () => clearInterval(interval)
   }, [fetchStats])
 

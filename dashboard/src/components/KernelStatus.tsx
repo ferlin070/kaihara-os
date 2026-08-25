@@ -27,7 +27,7 @@ export default function KernelStatus() {
 
   useEffect(() => {
     fetchStatus()
-    const i = setInterval(fetchStatus, 5000)
+    const i = setInterval(fetchStatus, 15000)
     return () => clearInterval(i)
   }, [fetchStatus])
 
