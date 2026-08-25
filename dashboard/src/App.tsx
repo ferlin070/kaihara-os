@@ -150,15 +150,12 @@ function AppContent() {
     setActiveTab('chat')
   }
 
-  const handleRenameConv = async (convId: string) => {
-    const title = prompt('Rename chat:')
-    if (!title?.trim()) return
-    await renameConversation(convId, title.trim())
+  const handleRenameConv = async (convId: string, newTitle: string) => {
+    await renameConversation(convId, newTitle)
     fetchConversations()
   }
 
   const handleDeleteConv = async (convId: string) => {
-    if (!confirm('Delete this chat permanently?')) return
     await deleteConversation(convId)
     if (convId === activeConvId) {
       handleNewChat()
