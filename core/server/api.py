@@ -1398,6 +1398,97 @@ def create_app(command_center) -> FastAPI:
         )
 
     # ============================================================
+    # Document Generation endpoints (PDF & Slides)
+    # ============================================================
+
+    @app.post("/api/documents/pdf/report")
+    async def generate_pdf_report(payload: dict):
+        from core.tools.pdf_generator import generate_pdf_report
+        return {
+            "path": generate_pdf_report(
+                title=payload.get("title", "Report"),
+                content=payload.get("content", []),
+                output_filename=payload.get("filename"),
+                author=payload.get("author", "Kaihara OS"),
+            )
+        }
+
+    @app.post("/api/documents/pdf/invoice")
+    async def generate_invoice(payload: dict):
+        from core.tools.pdf_generator import generate_invoice
+        return {
+            "path": generate_invoice(
+                invoice_number=payload.get("invoice_number", "INV-001"),
+                from_name=payload.get("from_name", ""),
+                from_address=payload.get("from_address", ""),
+                to_name=payload.get("to_name", ""),
+                to_address=payload.get("to_address", ""),
+                items=payload.get("items", []),
+                tax_rate=payload.get("tax_rate", 0.0),
+                notes=payload.get("notes", ""),
+            )
+        }
+
+    @app.post("/api/documents/pdf/certificate")
+    async def generate_certificate(payload: dict):
+        from core.tools.pdf_generator import generate_certificate
+        return {
+            "path": generate_certificate(
+                recipient_name=payload.get("recipient_name", ""),
+                certificate_title=payload.get("title", "Certificate"),
+                description=payload.get("description", ""),
+                issue_date=payload.get("issue_date", ""),
+            )
+        }
+
+    @app.post("/api/documents/pdf/text")
+    async def generate_text_pdf(payload: dict):
+        from core.tools.pdf_generator import generate_text_pdf
+        return {
+            "path": generate_text_pdf(
+                text=payload.get("text", ""),
+                output_filename=payload.get("filename"),
+                title=payload.get("title"),
+            )
+        }
+
+    @app.post("/api/documents/slides/create")
+    async def create_slides(payload: dict):
+        from core.tools.slide_generator import create_presentation
+        return {
+            "path": create_presentation(
+                title=payload.get("title", "Presentation"),
+                slides=payload.get("slides", []),
+                output_filename=payload.get("filename"),
+            )
+        }
+
+    @app.post("/api/documents/slides/pitch")
+    async def generate_pitch(payload: dict):
+        from core.tools.slide_generator import generate_business_pitch
+        return {
+            "path": generate_business_pitch(
+                company_name=payload.get("company_name", "Company"),
+                problem=payload.get("problem", ""),
+                solution=payload.get("solution", ""),
+                market_size=payload.get("market_size", ""),
+                business_model=payload.get("business_model", ""),
+                team=payload.get("team", []),
+                ask=payload.get("ask", ""),
+            )
+        }
+
+    @app.post("/api/documents/slides/report")
+    async def generate_report_slides(payload: dict):
+        from core.tools.slide_generator import generate_report_slides
+        return {
+            "path": generate_report_slides(
+                title=payload.get("title", "Report"),
+                sections=payload.get("sections", []),
+            )
+        }
+
+    # ============================================================
     # Marketing System endpoints
     # ============================================================
 
