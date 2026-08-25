@@ -42,6 +42,11 @@ api_key_header = "Authorization"
 name = "OpenCode Zen (free models)"
 base_url = "https://opencode.ai/zen/v1"
 api_key_header = "Authorization"
+[provider.openrouter]
+name = "OpenRouter (free models)"
+base_url = "https://openrouter.ai/api/v1"
+api_key_header = "Authorization"
+
 
 # ============================================================
 #  AGENT MODEL ROUTING
@@ -52,7 +57,7 @@ model = "rootsys/glm-5.2"
 variant = "default"
 
 [agent.reflex]
-model = "rootsys/deepseek-v4-flash"
+model = "openrouter/nvidia/nemotron-3.5-lightning:free"
 variant = "low"
 
 [agent.deep_reasoner]
@@ -60,29 +65,29 @@ model = "rootsys/glm-5.3"
 variant = "high"
 
 [agent.coding]
-model = "rootsys/kimi-k3"
+model = "openrouter/cohere/north-mini-code:free"
 
 [agent.research]
-model = "rootsys/glm-5.2"
+model = "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
 
 [agent.marketing]
-model = "rootsys/glm-5.2"
+model = "openrouter/nvidia/nemotron-3.5-lightning:free"
 
 [agent.security]
 model = "rootsys/glm-5.3"
 variant = "think"
 
 [agent.deploy]
-model = "rootsys/deepseek-v4-flash"
+model = "openrouter/poolside/laguna-s-2.1:free"
 
 [agent.storage]
-model = "rootsys/deepseek-v4-flash"
+model = "openrouter/poolside/laguna-s-2.1:free"
 
 [agent.notification]
-model = "rootsys/deepseek-v4-flash"
+model = "openrouter/nvidia/nemotron-3.5-lightning:free"
 
 [agent.meta]
-model = "rootsys/deepseek-v4-flash"
+model = "openrouter/nvidia/nemotron-3.5-lightning:free"
 
 # ============================================================
 #  MODEL VARIANTS

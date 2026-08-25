@@ -24,10 +24,12 @@ class ModelRouter:
         )
         self.last_provider = ""
         self.agent_models = {}
-        for key, val in config.items():
-            if key.startswith("agent."):
-                agent_name = key.split(".", 1)[1]
-                self.agent_models[agent_name] = val.get("model", self.default)
+        # Handle both flat (agent.kaihara) and nested (agent -> kaihara) config
+        agent_section = config.get("agent", {})
+        if isinstance(agent_section, dict):
+            for agent_name, agent_cfg in agent_section.items():
+                if isinstance(agent_cfg, dict):
+                    self.agent_models[agent_name] = agent_cfg.get("model", self.default)
 
     def _parse_model_id(self, model_id: str) -> tuple[str, str]:
         if "/" in model_id:
@@ -60,7 +62,10 @@ class ModelRouter:
 
         Chain: requested/primary -> fallback_chain -> always ends with local.
         """
+        import logging
+        _log = logging.getLogger("kaihara.model_router")
         primary = model or self.default
+        _log.warning(f"ModelRouter.complete: model={model}, primary={primary}, default={self.default}, agent_models={self.agent_models}")
         # Build attempt chain without duplicates
         chain: list[str] = [primary]
         for mid in self.fallback_chain:
@@ -93,6 +98,7 @@ class ModelRouter:
                        system: str, messages: list[dict],
                        max_tokens: int = 4096) -> tuple[str, bool]:
         """Try one provider. Returns (text, success)."""
+
         provider_config = self._get_provider_config(provider)
         base_url = provider_config.get("base_url")
         api_key = provider_config.get("api_key") or self._get_api_key(provider)
@@ -115,6 +121,7 @@ class ModelRouter:
             api_key, model_name, system, messages,
             api_key_header, max_tokens
         )
+
         ok = not text.startswith("[API Error") \
              and not text.startswith("[Error:") \
              and len(text.strip()) > 0
@@ -198,10 +205,11 @@ class ModelRouter:
             "model": model,
             "messages": [{"role": "system", "content": system}] + messages,
             "stream": False,
-            "options": {"num_predict": max_tokens},
+            "max_tokens": max_tokens,
         }
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
+            timeout_val = 30 if 'openrouter' in url else 120
+            async with httpx.AsyncClient(timeout=timeout_val) as client:
                 resp = await client.post(url, json=payload, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()

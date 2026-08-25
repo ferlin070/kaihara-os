@@ -318,6 +318,8 @@ class CommandCenter:
         import os, re, json, logging
         from pathlib import Path
         _log = logging.getLogger("kaihara.reflex")
+        # Use agent-specific model for reflex
+        reflex_model = self.model.agent_models.get("reflex", self.model.default)
 
         system = self._kaihara_system_prompt()
         if context:
@@ -347,7 +349,7 @@ class CommandCenter:
             try:
                 os.chdir("/opt/kaihara-os")
                 # First get AI content
-                response = await self.model.complete(
+                response = await self.model.complete(model=reflex_model, 
                     system=system,
                     messages=[{"role": "user", "content": prompt}]
                 )
@@ -377,7 +379,7 @@ class CommandCenter:
 
         if wants_telegram and not wants_pdf:
             try:
-                response = await self.model.complete(
+                response = await self.model.complete(model=reflex_model, 
                     system=system,
                     messages=[{"role": "user", "content": prompt}]
                 )
@@ -391,7 +393,7 @@ class CommandCenter:
 
         if wants_pdf and not wants_telegram:
             try:
-                response = await self.model.complete(
+                response = await self.model.complete(model=reflex_model, 
                     system=system,
                     messages=[{"role": "user", "content": prompt}]
                 )
@@ -414,7 +416,7 @@ class CommandCenter:
         if wants_agent_info:
             # Answer about fleet agents from brain context
             agent_info = orchestrator_brain.get_fleet_summary()
-            response = await self.model.complete(
+            response = await self.model.complete(model=reflex_model, 
                 system=system,
                 messages=[{"role": "user", "content": f"{prompt}\n\n[AGENT DATA]\n{agent_info}"}]
             )
@@ -423,7 +425,7 @@ class CommandCenter:
         if wants_channel_info:
             # Answer about communication channels
             channel_info = orchestrator_brain.get_channel_summary()
-            response = await self.model.complete(
+            response = await self.model.complete(model=reflex_model, 
                 system=system,
                 messages=[{"role": "user", "content": f"{prompt}\n\n[CHANNEL DATA]\n{channel_info}"}]
             )
@@ -437,21 +439,21 @@ class CommandCenter:
                 servers = r.json()
                 sys_info = orchestrator_brain.get_system_summary()
                 server_data = json.dumps(servers, indent=2, default=str)[:2000]
-                response = await self.model.complete(
+                response = await self.model.complete(model=reflex_model, 
                     system=system,
                     messages=[{"role": "user", "content": f"{prompt}\n\n[SYSTEM DATA]\n{sys_info}\n\n[LIVE SERVER STATUS]\n{server_data}"}]
                 )
                 return {"text": response, "agent": "kaihara"}
             except Exception:
                 sys_info = orchestrator_brain.get_system_summary()
-                response = await self.model.complete(
+                response = await self.model.complete(model=reflex_model, 
                     system=system,
                     messages=[{"role": "user", "content": f"{prompt}\n\n[SYSTEM DATA]\n{sys_info}"}]
                 )
                 return {"text": response, "agent": "kaihara"}
 
         # ── DEFAULT: plain text response ──
-        response = await self.model.complete(
+        response = await self.model.complete(model=reflex_model, 
             system=system,
             messages=[{"role": "user", "content": prompt}]
         )

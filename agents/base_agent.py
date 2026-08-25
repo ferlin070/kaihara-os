@@ -81,9 +81,12 @@ class BaseAgent:
         # Don't compress SOUL.md — it's the personality
         if context:
             prompt = f"{context}\n\n---\n\n{prompt}"
+        # Use agent-specific model if available
+        agent_model = self.model.agent_models.get(self.AGENT_TYPE, self.model.default)
         response = await self.model.complete(
             system=system,
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            model=agent_model
         )
         return response
 
