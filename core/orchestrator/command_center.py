@@ -216,6 +216,7 @@ class CommandCenter:
                     intent = await self.intent_parser.parse(clean_q)
                     # 1) Get the actual AI answer using normal pipeline
                     route = await self.split_brain.decide(intent)
+
                     context_tg = (self.memory.super_context(clean_q)
                                   if self.memory else "")
                     if route == "deep":
@@ -253,6 +254,14 @@ class CommandCenter:
                 pass  # fall through to normal routing
 
         route = await self.split_brain.decide(intent)
+
+        # Force reflex route for tool-capable tasks (PDF, Telegram, file ops)
+        import re as _re
+        _tool_triggers = _re.compile(
+            r"\b(pdf|generate.*pdf|hantar.*telegram|send.*telegram|"
+            r"send.*file|upload|download|report.*pdf|laporan.*pdf)\b", _re.I)
+        if _tool_triggers.search(message):
+            route = "reflex"
 
         if cache_check.get("should_skip") and route != "reflex":
             result = {
@@ -304,10 +313,15 @@ class CommandCenter:
 
     async def _reflex(self, message: str, context: str,
                        conv_id: str) -> dict:
-        """Fast lane: simple questions answered directly."""
+        """Fast lane: simple questions answered directly. Intent-based tool execution."""
+        import os, re, json, logging
+        from pathlib import Path
+        _log = logging.getLogger("kaihara.reflex")
+
         system = self._kaihara_system_prompt()
         if context:
             system = f"{system}\n\n{context}"
+
         conv_history = ""
         if self.memory:
             history = self.memory.get_context(conv_id)
@@ -318,11 +332,205 @@ class CommandCenter:
         prompt = message
         if conv_history:
             prompt = f"Conversation history:\n{conv_history}\n\nUser: {message}"
+
+        # ── INTENT DETECTION: PDF + Telegram ──
+        msg_lower = message.lower()
+        wants_pdf = bool(re.search(r'\b(pdf|report|laporan)\b', msg_lower))
+        wants_telegram = bool(re.search(r'\b(telegram|tg|hantar.*telegram|send.*telegram)\b', msg_lower))
+        wants_web = bool(re.search(r'\b(search|cari|google|web|research)\b', msg_lower))
+
+        # ── EXECUTE TOOLS DIRECTLY ──
+        if wants_pdf and wants_telegram:
+            try:
+                os.chdir("/opt/kaihara-os")
+                # First get AI content
+                response = await self.model.complete(
+                    system=system,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                # Generate PDF
+                from core.tools.pdf_generator import generate_pdf_report
+                from core.tools.notify_tools import send_telegram_document
+                blocks = self._parse_md_to_blocks(response)
+                pdf_path = generate_pdf_report(
+                    title=message[:60],
+                    content=blocks,
+                    subtitle="Ghazwah Group — Kaihara OS",
+                    output_filename=f"report_{message[:30].lower().replace(' ', '_')}"
+                )
+                # Send to Telegram
+                doc_result = send_telegram_document(
+                    file_path=pdf_path,
+                    caption=f"📊 {message[:100]}"
+                )
+                if doc_result.get("ok"):
+                    return {"text": f"✅ PDF telah dijana dan dihantar ke Telegram!\n📄 {pdf_path}", "agent": "reflex"}
+                else:
+                    err_msg = doc_result.get("error", "unknown")
+                    return {"text": f"⚠️ PDF dijana tapi gagal hantar: {err_msg} | {pdf_path}", "agent": "reflex"}
+            except Exception as e:
+                _log.error(f"PDF+TG error: {e}")
+                return {"text": f"❌ PDF error: {str(e)}", "agent": "reflex"}
+
+        if wants_telegram and not wants_pdf:
+            try:
+                response = await self.model.complete(
+                    system=system,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                from core.tools.notify_tools import send_telegram_message
+                result = send_telegram_message(response)
+                if result.get("ok"):
+                    return {"text": f"✅ Dihantar ke Telegram!\n\n{response[:400]}", "agent": "reflex"}
+                return {"text": response, "agent": "reflex"}
+            except Exception as e:
+                return {"text": f"❌ Telegram error: {str(e)}", "agent": "reflex"}
+
+        if wants_pdf and not wants_telegram:
+            try:
+                response = await self.model.complete(
+                    system=system,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                from core.tools.pdf_generator import generate_pdf_report
+                blocks = self._parse_md_to_blocks(response)
+                pdf_path = generate_pdf_report(
+                    title=message[:60],
+                    content=blocks,
+                    subtitle="Ghazwah Group — Kaihara OS"
+                )
+                return {"text": f"✅ PDF dijana!\n📄 {pdf_path}\n\n{response[:400]}", "agent": "reflex"}
+            except Exception as e:
+                return {"text": f"❌ PDF error: {str(e)}", "agent": "reflex"}
+
+        # ── DEFAULT: plain text response ──
         response = await self.model.complete(
             system=system,
             messages=[{"role": "user", "content": prompt}]
         )
         return {"text": response, "agent": "reflex"}
+
+    def _parse_md_to_blocks(self, md: str) -> list:
+        """Parse markdown text into PDF content blocks."""
+        blocks = []
+        for line in md.split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("# "):
+                blocks.append({"type": "heading", "text": stripped[2:], "level": 2})
+            elif stripped.startswith("## "):
+                blocks.append({"type": "heading", "text": stripped[3:], "level": 3})
+            elif stripped.startswith("### "):
+                blocks.append({"type": "heading", "text": stripped[4:], "level": 4})
+            elif stripped.startswith("- ") or stripped.startswith("* "):
+                if not blocks or blocks[-1].get("type") != "bullet":
+                    blocks.append({"type": "bullet", "items": []})
+                blocks[-1]["items"].append(stripped[2:])
+            elif stripped.startswith("> "):
+                blocks.append({"type": "highlight", "text": stripped[2:]})
+            elif stripped.startswith("| ") and "---" not in stripped:
+                cells = [c.strip() for c in stripped.split("|")[1:-1]]
+                if not blocks or blocks[-1].get("type") != "table":
+                    blocks.append({"type": "table", "headers": cells, "rows": []})
+                else:
+                    blocks[-1]["rows"].append(cells)
+            else:
+                blocks.append({"type": "paragraph", "text": stripped})
+        blocks = [b for b in blocks if not (b.get("type") == "table" and not b.get("rows"))]
+        return blocks if blocks else [{"type": "paragraph", "text": md}]
+
+
+    async def _execute_generate_and_send_pdf(self, args: dict) -> str:
+        """Generate PDF from markdown and send to Telegram."""
+        import os
+        os.chdir("/opt/kaihara-os")
+        from core.tools.pdf_generator import generate_pdf_report
+        from core.tools.notify_tools import send_telegram_document
+        from pathlib import Path
+
+        title = args.get("title", "Report")
+        content_md = args.get("content_md", "")
+
+        # Parse markdown to content blocks
+        blocks = []
+        for line in content_md.split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("# "):
+                blocks.append({"type": "heading", "text": stripped[2:], "level": 2})
+            elif stripped.startswith("## "):
+                blocks.append({"type": "heading", "text": stripped[3:], "level": 3})
+            elif stripped.startswith("### "):
+                blocks.append({"type": "heading", "text": stripped[4:], "level": 4})
+            elif stripped.startswith("- ") or stripped.startswith("* "):
+                if not blocks or blocks[-1].get("type") != "bullet":
+                    blocks.append({"type": "bullet", "items": []})
+                blocks[-1]["items"].append(stripped[2:])
+            elif stripped.startswith("> "):
+                blocks.append({"type": "highlight", "text": stripped[2:]})
+            elif stripped.startswith("| ") and "---" not in stripped:
+                cells = [c.strip() for c in stripped.split("|")[1:-1]]
+                if not blocks or blocks[-1].get("type") != "table":
+                    blocks.append({"type": "table", "headers": cells, "rows": []})
+                else:
+                    blocks[-1]["rows"].append(cells)
+            else:
+                blocks.append({"type": "paragraph", "text": stripped})
+
+        if not blocks:
+            blocks = [{"type": "paragraph", "text": content_md}]
+
+        # Clean empty tables
+        blocks = [b for b in blocks if not (b.get("type") == "table" and not b.get("rows"))]
+
+        pdf_path = generate_pdf_report(
+            title=title,
+            content=blocks,
+            subtitle="Ghazwah Group — Kaihara OS",
+            output_filename=f"report_{title[:30].lower().replace(' ', '_')}"
+        )
+
+        # Send to Telegram
+        result = send_telegram_document(
+            file_path=pdf_path,
+            caption=f"📊 {title[:100]}"
+        )
+
+        if result.get("ok"):
+            return f"✅ PDF dijana dan dihantar ke Telegram!\n📄 {pdf_path}"
+        else:
+            return f"⚠️ PDF dijana tapi gagal hantar: {result.get('error', 'unknown')}\n📄 {pdf_path}"
+
+    async def _execute_send_telegram(self, args: dict) -> str:
+        """Send text message to Telegram."""
+        from core.tools.notify_tools import send_telegram_message
+        message = args.get("message", "")
+        result = send_telegram_message(message)
+        if result.get("ok"):
+            return f"✅ Mesej dihantar ke Telegram!"
+        return f"⚠️ Gagal hantar: {result.get('error', 'unknown')}"
+
+    async def _execute_generate_pdf(self, args: dict) -> str:
+        """Generate PDF without sending."""
+        import os
+        os.chdir("/opt/kaihara-os")
+        from core.tools.pdf_generator import generate_pdf_report
+        title = args.get("title", "Report")
+        content_md = args.get("content_md", "")
+        blocks = [{"type": "paragraph", "text": content_md}]
+        pdf_path = generate_pdf_report(title=title, content=blocks)
+        return f"✅ PDF dijana: {pdf_path}"
+
+    async def _execute_web_search(self, args: dict) -> str:
+        """Web search."""
+        from core.tools.web_tools import web_search
+        query = args.get("query", "")
+        result = web_search(query)
+        if isinstance(result, dict):
+            return json.dumps(result, indent=2, default=str)
+        return str(result)
 
     async def _workflow(self, intent: dict) -> dict:
         """Workflow lane: trigger or propose automation."""
