@@ -258,8 +258,8 @@ function AppContent() {
           </div>
         </div>
 
-        {/* Tab Content — flex-1, overflow hidden */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        {/* Tab Content — flex-1, scrollable */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {activeTab === 'chat' && <Conversation messages={messages} thinking={thinking} onSend={handleSend} />}
           {activeTab === 'map' && <AgentMap />}
           {activeTab === 'tasks' && <TaskBoard />}
