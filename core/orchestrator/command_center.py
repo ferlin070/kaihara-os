@@ -9,6 +9,7 @@ from typing import Any
 
 from agents.base_agent import BaseAgent
 from core.orchestrator.model_router import ModelRouter
+from core.orchestrator.orchestrator_brain import brain as orchestrator_brain
 from core.orchestrator.intent_parser import IntentParser
 
 
@@ -403,12 +404,56 @@ class CommandCenter:
             except Exception as e:
                 return {"text": f"❌ PDF error: {str(e)}", "agent": "reflex"}
 
+        # ── INTENT: system/agent queries ──
+        wants_agent_info = bool(re.search(r'\b(agent|fleet|agent.*bawah|di bawah|tools.*ada|skills|capabiliti)\b', msg_lower))
+        wants_channel_info = bool(re.search(r'\b(whatsapp|gmail|email|telegram|channel|saluran)\b', msg_lower))
+        wants_system_info = bool(re.search(r'\b(server|dashboard|system|status|monitor|daemon|online|offline)\b', msg_lower))
+
+        if wants_agent_info:
+            # Answer about fleet agents from brain context
+            agent_info = orchestrator_brain.get_fleet_summary()
+            response = await self.model.complete(
+                system=system,
+                messages=[{"role": "user", "content": f"{prompt}\n\n[AGENT DATA]\n{agent_info}"}]
+            )
+            return {"text": response, "agent": "kaihara"}
+
+        if wants_channel_info:
+            # Answer about communication channels
+            channel_info = orchestrator_brain.get_channel_summary()
+            response = await self.model.complete(
+                system=system,
+                messages=[{"role": "user", "content": f"{prompt}\n\n[CHANNEL DATA]\n{channel_info}"}]
+            )
+            return {"text": response, "agent": "kaihara"}
+
+        if wants_system_info:
+            # Get live system status
+            try:
+                import httpx
+                r = httpx.get("http://localhost:7000/api/monitor/servers", timeout=10)
+                servers = r.json()
+                sys_info = orchestrator_brain.get_system_summary()
+                server_data = json.dumps(servers, indent=2, default=str)[:2000]
+                response = await self.model.complete(
+                    system=system,
+                    messages=[{"role": "user", "content": f"{prompt}\n\n[SYSTEM DATA]\n{sys_info}\n\n[LIVE SERVER STATUS]\n{server_data}"}]
+                )
+                return {"text": response, "agent": "kaihara"}
+            except Exception:
+                sys_info = orchestrator_brain.get_system_summary()
+                response = await self.model.complete(
+                    system=system,
+                    messages=[{"role": "user", "content": f"{prompt}\n\n[SYSTEM DATA]\n{sys_info}"}]
+                )
+                return {"text": response, "agent": "kaihara"}
+
         # ── DEFAULT: plain text response ──
         response = await self.model.complete(
             system=system,
             messages=[{"role": "user", "content": prompt}]
         )
-        return {"text": response, "agent": "reflex"}
+        return {"text": response, "agent": "kaihara"}
 
     def _parse_md_to_blocks(self, md: str) -> list:
         """Parse markdown text into PDF content blocks."""
@@ -636,16 +681,18 @@ class CommandCenter:
         }
 
     def _kaihara_system_prompt(self) -> str:
-        """Load Kaihara SOUL.md as system prompt."""
+        """Load Kaihara SOUL.md + orchestrator context as system prompt."""
         soul_path = self.config.get("soul_dir", "config/soul")
         import os
         path = os.path.join(soul_path, "kaihara.md")
         try:
             with open(path, encoding="utf-8") as f:
-                return f.read()
+                soul = f.read()
         except FileNotFoundError:
-            return ("You are Kaihara, a personal AI assistant. "
+            soul = ("You are Kaihara, a personal AI assistant. "
                     "Be concise, proactive, and action-oriented.")
+        # Inject orchestrator context
+        return soul + "\n\n" + orchestrator_brain.get_full_context()
 
     def _format_response(self, result: dict, route: str) -> str:
         if "text" in result:
