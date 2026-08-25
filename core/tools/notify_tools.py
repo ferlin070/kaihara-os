@@ -70,6 +70,50 @@ def send_telegram_message(message: str, chat_id: str | None = None,
     }
 
 
+
+def send_telegram_document(file_path: str, caption: str = "",
+                           chat_id: str | None = None) -> dict:
+    """Send a file (PDF, image, etc.) via Telegram Bot API sendDocument."""
+    import os, json
+    import httpx
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        return {"ok": False, "error": "TELEGRAM_BOT_TOKEN not set"}
+
+    chat_ids = [chat_id] if chat_id else [
+        i.strip() for i in os.environ.get("TELEGRAM_ALLOWED_IDS", "").split(",") if i.strip()
+    ]
+    if not chat_ids:
+        return {"ok": False, "error": "No chat_id provided or allowed"}
+
+    from pathlib import Path
+    p = Path(file_path)
+    if not p.exists():
+        return {"ok": False, "error": f"File not found: {file_path}"}
+
+    results = []
+    for cid in chat_ids:
+        try:
+            with open(p, "rb") as f:
+                r = httpx.post(
+                    f"https://api.telegram.org/bot{token}/sendDocument",
+                    data={"chat_id": int(cid), "caption": caption[:1024]},
+                    files={"document": (p.name, f, "application/pdf" if p.suffix == ".pdf" else "application/octet-stream")},
+                    timeout=30,
+                )
+                d = r.json()
+                ok = bool(d.get("ok"))
+                results.append({
+                    "chat_id": cid, "ok": ok,
+                    "error": d.get("description", "") if not ok else "",
+                })
+        except Exception as e:
+            results.append({"chat_id": cid, "ok": False, "error": str(e)})
+
+    sent = sum(1 for r in results if r["ok"])
+    return {"ok": sent > 0, "sent": sent, "total": len(results), "details": results}
+
 def telegram_status() -> dict:
     token = _get_token()
     if not token:
