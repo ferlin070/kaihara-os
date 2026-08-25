@@ -15,19 +15,14 @@ language = "ms"
 # ============================================================
 
 [model]
-default = "rootsys/glm-5.2"
-small_model = "rootsys/deepseek-v4-flash"
-reflex_model = "rootsys/deepseek-v4-flash"
-fallback_chain = ["opencode-zen/x-preview-f-free", "9router/ag/gemini-3-flash", "ollama/llama3.2:1b"]
+default = "ollama/llama3.1:8b"
+small_model = "ollama/llama3.2:1b"
+reflex_model = "openrouter/nvidia/nemotron-3.5-lightning:free"
+fallback_chain = ["9router/ag/gemini-3-flash", "ollama/llama3.2:1b"]
 
 # ============================================================
 #  PROVIDERS
 # ============================================================
-
-[provider.rootsys]
-name = "RootSys Cloud"
-base_url = "https://rootsys.cloud/v1"
-api_key_header = "X-API-Key"
 
 [provider.ollama]
 name = "Ollama (local)"
@@ -53,7 +48,7 @@ api_key_header = "Authorization"
 # ============================================================
 
 [agent.kaihara]
-model = "rootsys/glm-5.2"
+model = "ollama/llama3.1:8b"
 variant = "default"
 
 [agent.reflex]
@@ -61,7 +56,7 @@ model = "openrouter/nvidia/nemotron-3.5-lightning:free"
 variant = "low"
 
 [agent.deep_reasoner]
-model = "rootsys/glm-5.3"
+model = "9router/ag/gemini-3-flash"
 variant = "high"
 
 [agent.coding]
@@ -74,7 +69,7 @@ model = "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
 model = "openrouter/nvidia/nemotron-3.5-lightning:free"
 
 [agent.security]
-model = "rootsys/glm-5.3"
+model = "9router/ag/gemini-3-flash"
 variant = "think"
 
 [agent.deploy]
