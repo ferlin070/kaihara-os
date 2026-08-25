@@ -24,7 +24,7 @@ WEB_AGENTS = {"marketing", "research", "kaihara"}
 # PDF / report triggers
 PDF_TRIGGER = re.compile(
     r"\b(pdf|report|laporan|dokumen|document|Invoice|resume|borang|form)\b", re.I)
-PDF_AGENTS = {"kaihara", "marketing", "research"}
+PDF_AGENTS = {"kaihara", "marketing", "research", "deploy", "editor", "meta", "security"}
 
 # Telegram / notification triggers
 TG_TRIGGER = re.compile(
@@ -256,9 +256,9 @@ class GenericAgent(BaseAgent):
             full_context = "\n\n".join(
                 x for x in (skill_context, memory_context, web_context) if x)
 
-            # Telegram send: only for pure messaging tasks.
+            # Telegram send: only for pure messaging tasks (skip if PDF requested)
             # Research/web tasks: skip (CommandCenter delivers final answer)
-            if TG_TRIGGER.search(task) and not WEB_TRIGGER.search(task):
+            if TG_TRIGGER.search(task) and not WEB_TRIGGER.search(task) and not PDF_TRIGGER.search(task):
                 st = telegram_status()
                 if st.get("configured"):
                     tg_result = send_telegram_message(f"Kaihara: {task}")

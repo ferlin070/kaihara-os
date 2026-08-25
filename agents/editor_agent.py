@@ -5,7 +5,7 @@ Integrates FFmpeg, MoviePy, Pillow, Pexels API, Edge TTS, Google Drive, Pinteres
 
 import os
 import re
-from agents.base_agent import BaseAgent
+from agents.base_agent import BaseAgent, GenericAgent
 from core.tools.media_tools import (
     video_probe, video_trim, video_concat, video_overlay,
     video_add_audio, video_add_text, video_add_subtitles,
@@ -31,7 +31,7 @@ from core.tools.google_flow_tools import GoogleFlowTools
 from core.tools.pipeline_tools import VideoPipeline
 
 
-class EditorAgent(BaseAgent):
+class EditorAgent(GenericAgent):
     """Video editing, image generation, and media processing agent."""
 
     AGENT_TYPE = "editor"

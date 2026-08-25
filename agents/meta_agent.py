@@ -8,11 +8,11 @@ import time
 from datetime import datetime, date
 from typing import Any
 
-from agents.base_agent import BaseAgent
+from agents.base_agent import BaseAgent, GenericAgent
 from core.brain.learning_cache import LearningCache
 
 
-class MetaAgent(BaseAgent):
+class MetaAgent(GenericAgent):
     """Observe, learn, optimize all other agents."""
 
     AGENT_TYPE = "meta"

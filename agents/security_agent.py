@@ -9,10 +9,10 @@ import subprocess
 from datetime import datetime
 from typing import Any
 
-from agents.base_agent import BaseAgent
+from agents.base_agent import BaseAgent, GenericAgent
 
 
-class SecurityAgent(BaseAgent):
+class SecurityAgent(GenericAgent):
     """Security agent with real tool capabilities."""
 
     AGENT_TYPE = "security"

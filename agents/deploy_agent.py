@@ -4,7 +4,7 @@ Handles Docker, Git, Proxmox LXC, Systemd, Nginx, Database, Health checks.
 """
 
 import json
-from agents.base_agent import BaseAgent
+from agents.base_agent import BaseAgent, GenericAgent
 from core.tools.deploy_tools import (
     docker_ps, docker_compose, docker_build, docker_logs, docker_exec,
     docker_inspect, docker_cleanup,
@@ -17,7 +17,7 @@ from core.tools.deploy_tools import (
 )
 
 
-class DeployAgent(BaseAgent):
+class DeployAgent(GenericAgent):
     """Deployment and infrastructure management agent."""
 
     AGENT_TYPE = "deploy"
