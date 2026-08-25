@@ -60,7 +60,7 @@ model = "9router/ag/gemini-3-flash"
 variant = "high"
 
 [agent.coding]
-model = "openrouter/cohere/north-mini-code:free"
+model = "openrouter/nvidia/nemotron-3.5-lightning:free"
 
 [agent.research]
 model = "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
