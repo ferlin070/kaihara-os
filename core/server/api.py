@@ -429,6 +429,26 @@ def create_app(command_center) -> FastAPI:
             return {"error": "Planning pipeline not initialized"}
         return {"tasks": pipeline.get_tasks(prd_id=prd_id, status=status)}
 
+    @app.post("/api/planning/tasks")
+    async def create_task(payload: dict):
+        pipeline = getattr(command_center, "_planning", None)
+        if not pipeline:
+            return {"error": "Planning pipeline not initialized"}
+        import hashlib
+        from datetime import datetime
+        task_id = payload.get("id", f"T{hashlib.sha256(datetime.now().isoformat().encode()).hexdigest()[:8]}")
+        task = {
+            "id": task_id,
+            "title": payload.get("title", "Untitled Task"),
+            "description": payload.get("description", ""),
+            "phase": payload.get("phase", "General"),
+            "status": payload.get("status", "todo"),
+            "complexity": payload.get("complexity", "medium"),
+            "assigned_agent": payload.get("assigned_agent"),
+        }
+        pipeline.tracker.save_tasks([task])
+        return {"created": True, "task_id": task_id, "task": task}
+
     @app.delete("/api/planning/tasks/{task_id}")
     async def delete_task(task_id: str):
         pipeline = getattr(command_center, "_planning", None)

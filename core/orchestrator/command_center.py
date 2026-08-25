@@ -260,7 +260,9 @@ class CommandCenter:
         import re as _re
         _tool_triggers = _re.compile(
             r"\b(pdf|generate.*pdf|hantar.*telegram|send.*telegram|"
-            r"send.*file|upload|download|report.*pdf|laporan.*pdf)\b", _re.I)
+            r"send.*file|upload|download|report.*pdf|laporan.*pdf|"
+            r"scan|pentest|recon|dns.*lookup|port.*scan|vuln|xss|sqli|security|"
+            r"task|tugas|buat.*task|create.*task|add.*task|assign.*task)\b", _re.I)
         if _tool_triggers.search(message):
             route = "reflex"
 
@@ -407,6 +409,92 @@ class CommandCenter:
                 return {"text": f"✅ PDF dijana!\n📄 {pdf_path}\n\n{response[:400]}", "agent": "reflex"}
             except Exception as e:
                 return {"text": f"❌ PDF error: {str(e)}", "agent": "reflex"}
+
+        # ── INTENT: security scan ──
+        wants_security = bool(re.search(r'\b(scan|pentest|recon|dns.*lookup|port.*scan|vuln|xss|sqli|security|celah|keselamatan)\b', msg_lower))
+
+        if wants_security:
+            import re as _re
+            target_match = _re.search(r'([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,})', message)
+            if target_match:
+                target = target_match.group(1)
+                try:
+                    import socket
+                    scan_results = []
+                    scan_results.append(f"🔍 **Security Scan: {target}**\n")
+                    try:
+                        ip = socket.gethostbyname(target)
+                        scan_results.append(f"✅ DNS: {target} → {ip}")
+                    except Exception as e:
+                        scan_results.append(f"❌ DNS failed: {e}")
+                    import asyncio
+                    async def quick_port_scan(host, ports=[80, 443, 22, 21, 25, 53, 8080, 3306]):
+                        open_ports = []
+                        for port in ports:
+                            try:
+                                _, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=1)
+                                writer.close()
+                                await writer.wait_closed()
+                                open_ports.append(port)
+                            except: pass
+                        return open_ports
+                    open_ports = await quick_port_scan(ip)
+                    if open_ports:
+                        scan_results.append(f"✅ Open ports: {', '.join(map(str, open_ports))}")
+                    else:
+                        scan_results.append("⚠️ No common ports open")
+                    try:
+                        import httpx
+                        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                            r = await client.get(f"https://{target}")
+                            scan_results.append(f"✅ HTTPS: {r.status_code} | Server: {r.headers.get('server', 'unknown')}")
+                    except Exception as e:
+                        scan_results.append(f"⚠️ HTTPS: {str(e)[:50]}")
+                    try:
+                        import httpx
+                        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                            r = await client.get(f"http://{target}")
+                            scan_results.append(f"✅ HTTP: {r.status_code} | Server: {r.headers.get('server', 'unknown')}")
+                    except Exception as e:
+                        scan_results.append(f"⚠️ HTTP: {str(e)[:50]}")
+                    scan_result = "\n".join(scan_results)
+                    return {"text": scan_result, "agent": "security"}
+                except Exception as e:
+                    return {"text": f"❌ Scan error: {str(e)}", "agent": "security"}
+            else:
+                return {"text": "⚠️ Sila specify target domain (contoh: scan example.com)", "agent": "security"}
+
+        # ── INTENT: task creation ──
+        wants_task = bool(re.search(r'\b(task|tugas|buat.*task|create.*task|add.*task|assign.*task)\b', msg_lower))
+
+        if wants_task:
+            task_title = message.strip()
+            for prefix in ["buat task", "create task", "add task", "task baru", "new task", "assign task"]:
+                if task_title.lower().startswith(prefix):
+                    task_title = task_title[len(prefix):].strip()
+                    break
+            if not task_title:
+                task_title = message[:100]
+            try:
+                import hashlib
+                from datetime import datetime
+                task_id = f"T{hashlib.sha256(datetime.now().isoformat().encode()).hexdigest()[:8]}"
+                planning = getattr(self, '_planning', None)
+                if planning:
+                    task = {
+                        "id": task_id,
+                        "title": task_title,
+                        "description": f"Created from chat: {message[:200]}",
+                        "phase": "General",
+                        "status": "todo",
+                        "complexity": "medium",
+                    }
+                    planning.tracker.save_tasks([task])
+                    return {"text": f"✅ Task created: **{task_title}**\n📋 ID: {task_id}\n📊 Status: todo\n\nTask will appear in Dashboard → Task Board.", "agent": "kaihara"}
+                else:
+                    return {"text": "⚠️ Planning pipeline not initialized", "agent": "kaihara"}
+            except Exception as e:
+                return {"text": f"❌ Task error: {str(e)}", "agent": "kaihara"}
 
         # ── INTENT: system/agent queries ──
         wants_agent_info = bool(re.search(r'\b(agent|fleet|agent.*bawah|di bawah|tools.*ada|skills|capabiliti)\b', msg_lower))

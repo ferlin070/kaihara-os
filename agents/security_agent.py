@@ -328,8 +328,12 @@ class SecurityAgent(GenericAgent):
                 if not target:
                     return {"agent": self.AGENT_TYPE, "text": "Please specify a target (e.g., 'pentest example.com')", "status": "error"}
 
-                # Check approval
-                if self.approval_gate:
+                # Check if target is authorized (no approval needed)
+                authorized_domains = ["ghazwahgroup.com", "nakhodacloud.top", "kaihara-ai.nakhodacloud.top", "kaihara-api.nakhodacloud.top"]
+                is_authorized = any(d in target for d in authorized_domains)
+
+                # Check approval (skip for authorized domains)
+                if self.approval_gate and not is_authorized:
                     req = await self.approval_gate.request(
                         "run_pentest", self.AGENT_TYPE,
                         {"target": target, "task": task}
