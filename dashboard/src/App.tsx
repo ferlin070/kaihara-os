@@ -1,29 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ThemeProvider, useTheme } from './lib/ThemeContext'
-import KaiharaStatus from './components/KaiharaStatus'
 import Conversation from './components/Conversation'
-import AgentActivity from './components/AgentActivity'
-import SystemStatus from './components/SystemStatus'
-import MorningBriefing from './components/MorningBriefing'
-import GoalsTracker from './components/GoalsTracker'
-import NotificationPanel from './components/NotificationPanel'
 import TaskBoard from './components/TaskBoard'
-import SkillBrowser from './components/SkillBrowser'
 import SecurityView from './components/SecurityView'
-import DaemonView from './components/DaemonView'
-import PendingApprovals from './components/PendingApprovals'
-import MarketingDashboard from './components/MarketingDashboard'
-import SystemStatsWidget from './components/SystemStatsWidget'
-import DeployView from './components/DeployView'
-import EditorView from './components/EditorView'
-import WorkflowDashboard from './components/WorkflowDashboard'
-import KernelStatus from './components/KernelStatus'
-import MetaPanel from './components/MetaPanel'
-import AgentMap from './components/AgentMap'
-import ChatSessions from './components/ChatSessions'
 import MemoryTree from './components/MemoryTree'
 import {
-  getStatus, sendMessage, getMapState, getChatHistory,
+  getStatus, sendMessage, getChatHistory,
   getConversations, newConversation, renameConversation, deleteConversation,
   type SystemStatus as Status, type Conversation as Conv,
 } from './lib/api'
@@ -34,16 +16,9 @@ const ACTIVE_CONV_KEY = 'kaihara_active_conv'
 
 const TABS = [
   { id: 'chat' as const, label: 'Chat', icon: '💬' },
-  { id: 'map' as const, label: 'Map', icon: '🗺️' },
   { id: 'tasks' as const, label: 'Tasks', icon: '📋' },
-  { id: 'skills' as const, label: 'Skills', icon: '⚡' },
   { id: 'security' as const, label: 'Security', icon: '🔒' },
   { id: 'memory' as const, label: 'Memory', icon: '🧠' },
-  { id: 'daemon' as const, label: 'Daemon', icon: '⚙️' },
-  { id: 'marketing' as const, label: 'Marketing', icon: '📈' },
-  { id: 'deploy' as const, label: 'Deploy', icon: '🚀' },
-  { id: 'editor' as const, label: 'Editor', icon: '✏️' },
-  { id: 'workflows' as const, label: 'Workflows', icon: '🔄' },
 ]
 
 function ThemeToggle() {
@@ -51,8 +26,8 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-lg hover:bg-kaihara-hover transition-colors text-kaihara-muted hover:text-kaihara-text"
-      title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      className="p-2 rounded-lg hover:bg-white/10 transition-colors text-kaihara-muted hover:text-kaihara-text"
+      title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
     >
       {theme === 'dark' ? '☀️' : '🌙'}
     </button>
@@ -63,30 +38,19 @@ function AppContent() {
   const [status, setStatus] = useState<Status | null>(null)
   const [messages, setMessages] = useState<Msg[]>([])
   const [thinking, setThinking] = useState(false)
-  const [agents, setAgents] = useState<{name: string; status: string; task: string; progress: number}[]>([])
-  const [notifications, setNotifications] = useState<{type: string; text: string}[]>([])
   const [activeTab, setActiveTab] = useState<typeof TABS[number]['id']>('chat')
   const [activeConvId, setActiveConvId] = useState<string>(
     () => localStorage.getItem(ACTIVE_CONV_KEY) || 'dashboard')
   const [conversations, setConversations] = useState<Conv[]>([])
+  const [showSidebar, setShowSidebar] = useState(false)
 
   const failCountRef = useRef(0)
 
   const fetchStatus = useCallback(async () => {
     try {
-      const [s, mapData] = await Promise.all([
-        getStatus(),
-        getMapState().catch(() => ({ agents: {} })),
-      ])
+      const s = await getStatus()
       failCountRef.current = 0
       setStatus(s)
-      if (s.fleet_agents) {
-        const agentStatus = s.fleet_agents.map(name => {
-          const mapAgent = (mapData.agents as Record<string, any>)?.[name]
-          return { name, status: mapAgent?.status || 'idle', task: mapAgent?.task || '', progress: mapAgent?.progress || 0 }
-        })
-        setAgents(agentStatus)
-      }
     } catch {
       failCountRef.current += 1
       if (failCountRef.current >= 4) setStatus(null)
@@ -95,7 +59,7 @@ function AppContent() {
 
   useEffect(() => {
     fetchStatus()
-    const interval = setInterval(fetchStatus, 15000)
+    const interval = setInterval(fetchStatus, 30000)
     return () => clearInterval(interval)
   }, [fetchStatus])
 
@@ -148,6 +112,7 @@ function AppContent() {
   const handleSelectConv = (convId: string) => {
     setActiveConvId(convId)
     setActiveTab('chat')
+    setShowSidebar(false)
   }
 
   const handleRenameConv = async (convId: string, newTitle: string) => {
@@ -172,116 +137,103 @@ function AppContent() {
       setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route, provider: (res as any).provider }])
       fetchConversations()
     } catch {
-      setMessages(prev => [...prev, { role: 'kaihara', text: '[Connection error. Is Kaihara server running on :7000?]' }])
+      setMessages(prev => [...prev, { role: 'kaihara', text: '[Connection error. Is Kaihara server running?]' }])
     }
     setThinking(false)
   }
 
+  const activeConv = conversations.find(c => c.conv_id === activeConvId)
+
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-kaihara-bg text-kaihara-text">
-      {/* Left Sidebar — fixed width, no shrink */}
-      <aside className="w-64 flex-shrink-0 h-full flex flex-col border-r border-kaihara-border overflow-hidden">
-        {/* Logo */}
-        <div className="h-14 flex items-center gap-3 px-4 border-b border-kaihara-border flex-shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+    <div className="h-screen w-screen flex flex-col bg-kaihara-bg text-kaihara-text">
+      {/* Header */}
+      <header className="h-14 flex items-center justify-between px-4 border-b border-kaihara-border flex-shrink-0 bg-kaihara-surface">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-kaihara-primary to-kaihara-accent flex items-center justify-center text-white font-bold text-sm">
             K
           </div>
-          <div className="min-w-0">
-            <h1 className="text-base font-bold tracking-tight truncate">KAIHARA</h1>
-            <p className="text-[10px] text-kaihara-muted truncate">AI Super-Intelligence</p>
+          <div>
+            <h1 className="text-base font-bold tracking-tight">KAIHARA</h1>
+            <p className="text-[10px] text-kaihara-muted">AI Super-Intelligence</p>
           </div>
         </div>
-
-        {/* Chat Sessions — scroll */}
-        <div className="overflow-y-auto p-3 min-h-0 flex-shrink-0">
-          <ChatSessions
-            conversations={conversations}
-            activeConvId={activeConvId}
-            onSelect={handleSelectConv}
-            onNewChat={handleNewChat}
-            onRename={handleRenameConv}
-            onDelete={handleDeleteConv}
-          />
-        </div>
-
-        {/* Status — fills remaining space, scroll */}
-        <div className="flex-1 border-t border-kaihara-border overflow-y-auto min-h-0">
-          <div className="p-3 space-y-2">
-            <KaiharaStatus thinking={thinking} online={!!status?.kaihara_online} />
-            <SystemStatsWidget />
-            <KernelStatus />
-            <MetaPanel />
-          </div>
-        </div>
-      </aside>
-
-      {/* Center — flex-1, no shrink, column */}
-      <div className="flex-1 min-w-0 h-full flex flex-col">
-        {/* Top Bar */}
-        <header className="h-12 flex items-center justify-between px-5 border-b border-kaihara-border flex-shrink-0">
-          <div className="flex items-center gap-3">
-            {status?.kaihara_online ? (
-              <span className="badge-success">
-                <span className="status-dot bg-kaihara-success animate-pulse mr-1.5" />
-                Online
-              </span>
-            ) : (
-              <span className="badge-danger">
-                <span className="status-dot bg-kaihara-danger mr-1.5" />
-                Offline
-              </span>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          {status?.kaihara_online && (
+            <span className="text-xs text-kaihara-success flex items-center gap-1">
+              <span className="w-2 h-2 bg-kaihara-success rounded-full animate-pulse" />
+              Online
+            </span>
+          )}
           <ThemeToggle />
-        </header>
+        </div>
+      </header>
 
-        {/* Tabs */}
-        <div className="flex-shrink-0 border-b border-kaihara-border overflow-x-auto">
-          <div className="flex px-3">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 ${
-                  activeTab === tab.id
-                    ? 'text-kaihara-primary border-kaihara-primary'
-                    : 'text-kaihara-muted border-transparent hover:text-kaihara-text'
-                }`}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            ))}
+      {/* Main Content */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Sidebar - Chat List */}
+        <aside className={`${showSidebar ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 absolute md:relative z-40 w-64 h-full flex-shrink-0 border-r border-kaihara-border bg-kaihara-surface transition-transform duration-200`}>
+          <div className="p-3 h-full flex flex-col">
+            <button
+              onClick={handleNewChat}
+              className="w-full py-2 px-3 rounded-lg bg-kaihara-primary text-white text-sm font-medium hover:bg-kaihara-primary/90 transition-colors mb-3"
+            >
+              + New Chat
+            </button>
+            <div className="flex-1 overflow-y-auto space-y-1">
+              {conversations.map(c => (
+                <button
+                  key={c.conv_id}
+                  onClick={() => handleSelectConv(c.conv_id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                    c.conv_id === activeConvId
+                      ? 'bg-kaihara-accent/20 text-kaihara-text'
+                      : 'text-kaihara-muted hover:bg-kaihara-border/50'
+                  }`}
+                >
+                  <div className="truncate">{c.title}</div>
+                  <div className="text-[10px] text-kaihara-muted">{c.message_count} msgs</div>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        </aside>
 
-        {/* Tab Content — flex-1, scrollable */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {activeTab === 'chat' && <Conversation messages={messages} thinking={thinking} onSend={handleSend} />}
-          {activeTab === 'map' && <AgentMap />}
-          {activeTab === 'tasks' && <TaskBoard />}
-          {activeTab === 'skills' && <SkillBrowser />}
-          {activeTab === 'security' && <SecurityView />}
-          {activeTab === 'memory' && <MemoryTree />}
-          {activeTab === 'daemon' && <DaemonView />}
-          {activeTab === 'marketing' && <MarketingDashboard />}
-          {activeTab === 'deploy' && <DeployView />}
-          {activeTab === 'editor' && <EditorView />}
-          {activeTab === 'workflows' && <WorkflowDashboard />}
-        </div>
+        {/* Overlay for mobile */}
+        {showSidebar && (
+          <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setShowSidebar(false)} />
+        )}
+
+        {/* Content Area */}
+        <main className="flex-1 min-w-0 flex flex-col">
+          {/* Tabs */}
+          <div className="flex-shrink-0 border-b border-kaihara-border bg-kaihara-surface/50">
+            <div className="flex px-2">
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                    activeTab === tab.id
+                      ? 'text-kaihara-primary border-kaihara-primary'
+                      : 'text-kaihara-muted border-transparent hover:text-kaihara-text'
+                  }`}
+                >
+                  <span>{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tab Content */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {activeTab === 'chat' && <Conversation messages={messages} thinking={thinking} onSend={handleSend} />}
+            {activeTab === 'tasks' && <TaskBoard />}
+            {activeTab === 'security' && <SecurityView />}
+            {activeTab === 'memory' && <MemoryTree />}
+          </div>
+        </main>
       </div>
-
-      {/* Right Sidebar — fixed width, no shrink, scroll */}
-      <aside className="w-72 flex-shrink-0 h-full border-l border-kaihara-border overflow-y-auto">
-        <div className="p-3 space-y-3">
-          <MorningBriefing />
-          <PendingApprovals />
-          <GoalsTracker />
-          <NotificationPanel notifications={notifications} />
-          <AgentActivity agents={agents} />
-          <SystemStatus status={status} />
-        </div>
-      </aside>
     </div>
   )
 }
