@@ -411,7 +411,8 @@ class CommandCenter:
                 return {"text": f"❌ PDF error: {str(e)}", "agent": "reflex"}
 
         # ── INTENT: security scan ──
-        wants_security = bool(re.search(r'\b(scan|pentest|recon|dns.*lookup|port.*scan|vuln|xss|sqli|security|celah|keselamatan)\b', msg_lower))
+        wants_security = bool(re.search(r'\b(scan|pentest|pantest|recon|dns.*lookup|port.*scan|vuln|xss|sqli|security|celah|keselamatan)\b', msg_lower))
+        wants_pentest = bool(re.search(r'\b(pentest|pantest|penetration|full.*scan|full.*recon)\b', msg_lower))
 
         if wants_security:
             import re as _re
@@ -421,35 +422,67 @@ class CommandCenter:
                 try:
                     import socket
                     scan_results = []
-                    scan_results.append(f"🔍 **Security Scan: {target}**\n")
+                    
+                    if wants_pentest:
+                        scan_results.append(f"🛡️ **Penetration Test: {target}**\n")
+                    else:
+                        scan_results.append(f"🔍 **Security Scan: {target}**\n")
+                    
+                    # DNS Lookup
                     try:
                         ip = socket.gethostbyname(target)
                         scan_results.append(f"✅ DNS: {target} → {ip}")
                     except Exception as e:
                         scan_results.append(f"❌ DNS failed: {e}")
+                        ip = None
+                    
+                    # Port scan - more ports for pentest
                     import asyncio
-                    async def quick_port_scan(host, ports=[80, 443, 22, 21, 25, 53, 8080, 3306]):
+                    if wants_pentest:
+                        ports_to_scan = list(range(1, 1001))  # Full 1-1000 for pentest
+                    else:
+                        ports_to_scan = [80, 443, 22, 21, 25, 53, 8080, 3306]
+                    
+                    async def quick_port_scan(host, ports):
                         open_ports = []
-                        for port in ports:
+                        async def check_port(port):
                             try:
-                                _, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=1)
+                                _, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=0.5)
                                 writer.close()
                                 await writer.wait_closed()
-                                open_ports.append(port)
-                            except: pass
-                        return open_ports
-                    open_ports = await quick_port_scan(ip)
-                    if open_ports:
-                        scan_results.append(f"✅ Open ports: {', '.join(map(str, open_ports))}")
-                    else:
-                        scan_results.append("⚠️ No common ports open")
+                                return port
+                            except: return None
+                        tasks = [check_port(p) for p in ports]
+                        results = await asyncio.gather(*tasks)
+                        return [p for p in results if p is not None]
+                    
+                    if ip:
+                        open_ports = await quick_port_scan(ip, ports_to_scan)
+                        if open_ports:
+                            scan_results.append(f"✅ Open ports ({len(open_ports)}): {', '.join(map(str, open_ports[:20]))}" + ("..." if len(open_ports) > 20 else ""))
+                        else:
+                            scan_results.append("⚠️ No common ports open")
+                    
+                    # HTTP/HTTPS check
                     try:
                         import httpx
                         async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
                             r = await client.get(f"https://{target}")
-                            scan_results.append(f"✅ HTTPS: {r.status_code} | Server: {r.headers.get('server', 'unknown')}")
+                            server = r.headers.get('server', 'unknown')
+                            scan_results.append(f"✅ HTTPS: {r.status_code} | Server: {server}")
+                            # Check security headers
+                            headers = r.headers
+                            if 'strict-transport-security' in headers:
+                                scan_results.append(f"  ✓ HSTS enabled")
+                            if 'x-content-type-options' in headers:
+                                scan_results.append(f"  ✓ X-Content-Type-Options: {headers['x-content-type-options']}")
+                            if 'x-frame-options' in headers:
+                                scan_results.append(f"  ✓ X-Frame-Options: {headers['x-frame-options']}")
+                            else:
+                                scan_results.append(f"  ✗ Missing X-Frame-Options")
                     except Exception as e:
                         scan_results.append(f"⚠️ HTTPS: {str(e)[:50]}")
+                    
                     try:
                         import httpx
                         async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
@@ -457,6 +490,20 @@ class CommandCenter:
                             scan_results.append(f"✅ HTTP: {r.status_code} | Server: {r.headers.get('server', 'unknown')}")
                     except Exception as e:
                         scan_results.append(f"⚠️ HTTP: {str(e)[:50]}")
+                    
+                    # Subdomain enumeration for pentest
+                    if wants_pentest:
+                        common_subs = ['www', 'mail', 'ftp', 'admin', 'api', 'dev', 'staging', 'test', 'blog', 'shop']
+                        found_subs = []
+                        for sub in common_subs:
+                            try:
+                                subdomain = f"{sub}.{target}"
+                                socket.gethostbyname(subdomain)
+                                found_subs.append(subdomain)
+                            except: pass
+                        if found_subs:
+                            scan_results.append(f"✅ Subdomains found: {', '.join(found_subs[:10])}")
+                    
                     scan_result = "\n".join(scan_results)
                     return {"text": scan_result, "agent": "security"}
                 except Exception as e:
