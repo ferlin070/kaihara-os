@@ -66,20 +66,56 @@ class TelegramChannel(BaseChannel):
                     "username": update.message.from_user.username
                         if update.message.from_user else "unknown",
                 }
-                # Send typing indicator while thinking
-                async def _typing():
+                # Send processing message with timer
+                import time
+                start_time = time.time()
+                processing_msg = await self._app.bot.send_message(
+                    chat_id=int(chat_id),
+                    text="⏳ *Processing...* 0s",
+                    parse_mode="Markdown",
+                )
+                msg_id = processing_msg.message_id
+
+                # Update timer every second
+                async def _timer():
                     try:
                         while True:
-                            await self._app.bot.send_chat_action(
-                                chat_id=int(chat_id), action="typing")
-                            await asyncio.sleep(4)
+                            elapsed = int(time.time() - start_time)
+                            try:
+                                await self._app.bot.edit_message_text(
+                                    chat_id=int(chat_id),
+                                    message_id=msg_id,
+                                    text=f"⏳ *Processing...* {elapsed}s",
+                                    parse_mode="Markdown",
+                                )
+                            except Exception:
+                                pass
+                            await asyncio.sleep(1)
                     except asyncio.CancelledError:
                         pass
-                typing_task = asyncio.create_task(_typing())
+                timer_task = asyncio.create_task(_timer())
                 try:
-                    await self.receive(raw)
+                    result = await self.receive(raw)
+                    # Edit processing message with actual response
+                    timer_task.cancel()
+                    response_text = result.get("response", "No response")
+                    # Truncate if too long for Telegram
+                    if len(response_text) > 4000:
+                        response_text = response_text[:4000] + "\n\n... (truncated)"
+                    try:
+                        await self._app.bot.edit_message_text(
+                            chat_id=int(chat_id),
+                            message_id=msg_id,
+                            text=response_text,
+                        )
+                    except Exception:
+                        # If edit fails, send new message
+                        await self._app.bot.send_message(
+                            chat_id=int(chat_id),
+                            text=response_text,
+                        )
                 finally:
-                    typing_task.cancel()
+                    timer_task.cancel()
 
             self._app.add_handler(
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
@@ -104,6 +140,21 @@ class TelegramChannel(BaseChannel):
                 pass
         self._running = False
         return {"status": "stopped", "type": self.CHANNEL_TYPE}
+
+    async def receive(self, raw_message: dict) -> dict:
+        """Process incoming message - override to handle response in handle_message."""
+        parsed = self._parse_inbound(raw_message)
+        if not parsed or not parsed.get("text"):
+            return {"error": "Could not parse message"}
+
+        if self.command_center:
+            result = await self.command_center.handle_input(
+                source=self.CHANNEL_TYPE,
+                message=parsed["text"],
+                conv_id=parsed.get("conv_id", "default"),
+            )
+            return result
+        return {"text": parsed["text"], "response": "no command center"}
 
     async def send(self, recipient: str, text: str,
                     attachments: list = None) -> dict:
