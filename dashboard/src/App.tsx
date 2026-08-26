@@ -10,7 +10,7 @@ import {
   type SystemStatus as Status, type Conversation as Conv,
 } from './lib/api'
 
-export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string; provider?: string }
+export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string; provider?: string; images?: Array<{url: string; source?: string}> }
 
 const ACTIVE_CONV_KEY = 'kaihara_active_conv'
 
@@ -134,7 +134,7 @@ function AppContent() {
     setThinking(true)
     try {
       const res = await sendMessage(text, 'dashboard', activeConvId)
-      setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route, provider: (res as any).provider }])
+      setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route, provider: (res as any).provider, images: (res as any).images }])
       fetchConversations()
     } catch {
       setMessages(prev => [...prev, { role: 'kaihara', text: '[Connection error. Is Kaihara server running?]' }])

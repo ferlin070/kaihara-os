@@ -67,6 +67,22 @@ export default function Conversation({
                     <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
                   )}
                 </div>
+                {msg.images && msg.images.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {msg.images.map((img: any, idx: number) => (
+                      <a key={idx} href={img.url} target="_blank" rel="noopener noreferrer"
+                        className="block rounded-xl overflow-hidden border border-kaihara-border hover:border-kaihara-accent transition-colors">
+                        <img
+                          src={img.url}
+                          alt={`Gambar ${idx + 1}`}
+                          className="w-full h-40 object-cover"
+                          loading="lazy"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
