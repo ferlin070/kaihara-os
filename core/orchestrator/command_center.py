@@ -191,6 +191,17 @@ class CommandCenter:
         if self.memory:
             self.memory.add_context(conv_id, "user", message)
             context = self.memory.super_context(message)
+            # Add relevant memories for personalization
+            mem_results = self.memory.recall(message, limit=3)
+            if mem_results:
+                context += "
+
+## Relevant Memories:
+"
+                for m in mem_results:
+                    if m.get('score', 0) > 0.1:
+                        context += f"- [{m.get('topic', 'general')}] {m.get('content', '')[:100]}
+"
         else:
             context = ""
 
@@ -599,6 +610,10 @@ class CommandCenter:
             if stripped:
                 response = stripped
         except: pass
+        # Track last menu for context
+        if "Langkah Seterusnya:" in response or "Pilih" in response:
+            if hasattr(self, '_last_menu'):
+                self._last_menu = response
         return {"text": response, "agent": "kaihara"}
 
     def _parse_md_to_blocks(self, md: str) -> list:

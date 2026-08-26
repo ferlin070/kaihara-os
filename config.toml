@@ -17,7 +17,7 @@ language = "ms"
 [model]
 default = "ollama/llama3.1:8b"
 small_model = "ollama/llama3.2:1b"
-reflex_model = "openrouter/nvidia/nemotron-3.5-lightning:free"
+reflex_model = "9router/ag/gemini-3-flash"
 fallback_chain = ["9router/ag/gemini-3-flash", "ollama/llama3.2:1b"]
 
 # ============================================================
