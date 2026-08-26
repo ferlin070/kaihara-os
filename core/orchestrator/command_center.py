@@ -592,6 +592,13 @@ class CommandCenter:
             system=system,
             messages=[{"role": "user", "content": prompt}]
         )
+        # Strip thinking process from model response
+        try:
+            from core.tools.notify_tools import _strip_thinking
+            stripped = _strip_thinking(response)
+            if stripped:
+                response = stripped
+        except: pass
         return {"text": response, "agent": "kaihara"}
 
     def _parse_md_to_blocks(self, md: str) -> list:
