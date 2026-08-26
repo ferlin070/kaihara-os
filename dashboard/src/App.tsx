@@ -181,18 +181,43 @@ function AppContent() {
             </button>
             <div className="flex-1 overflow-y-auto space-y-1">
               {conversations.map(c => (
-                <button
+                <div
                   key={c.conv_id}
-                  onClick={() => handleSelectConv(c.conv_id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                  className={`group flex items-center rounded-lg text-sm transition-colors ${
                     c.conv_id === activeConvId
                       ? 'bg-kaihara-accent/20 text-kaihara-text'
                       : 'text-kaihara-muted hover:bg-kaihara-border/50'
                   }`}
                 >
-                  <div className="truncate">{c.title}</div>
-                  <div className="text-[10px] text-kaihara-muted">{c.message_count} msgs</div>
-                </button>
+                  <button
+                    onClick={() => handleSelectConv(c.conv_id)}
+                    className="flex-1 text-left px-3 py-2 min-w-0"
+                  >
+                    <div className="truncate">{c.title}</div>
+                    <div className="text-[10px] text-kaihara-muted">{c.message_count} msgs</div>
+                  </button>
+                  <div className="hidden group-hover:flex items-center gap-1 pr-2">
+                    <button
+                      onClick={() => {
+                        const newTitle = prompt('Rename chat:', c.title)
+                        if (newTitle?.trim()) handleRenameConv(c.conv_id, newTitle.trim())
+                      }}
+                      className="p-1 hover:bg-kaihara-border rounded text-xs"
+                      title="Rename"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('Delete this chat?')) handleDeleteConv(c.conv_id)
+                      }}
+                      className="p-1 hover:bg-kaihara-danger/20 rounded text-xs"
+                      title="Delete"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
