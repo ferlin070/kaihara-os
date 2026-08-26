@@ -94,8 +94,10 @@ class TelegramChannel(BaseChannel):
                     except asyncio.CancelledError:
                         pass
                 timer_task = asyncio.create_task(_timer())
+                receive_task = asyncio.create_task(self.receive(raw))
                 try:
-                    result = await self.receive(raw)
+                    # Wait for receive to complete while timer runs
+                    result = await receive_task
                     # Edit processing message with actual response
                     timer_task.cancel()
                     response_text = result.get("response", "No response")
@@ -116,6 +118,8 @@ class TelegramChannel(BaseChannel):
                         )
                 finally:
                     timer_task.cancel()
+                    if not receive_task.done():
+                        receive_task.cancel()
 
             self._app.add_handler(
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
