@@ -73,7 +73,7 @@ export default function Conversation({
                       <a key={idx} href={img.url} target="_blank" rel="noopener noreferrer"
                         className="block rounded-xl overflow-hidden border border-kaihara-border hover:border-kaihara-accent transition-colors">
                         <img
-                          src={img.url}
+                          src={img.thumbnail || img.url}
                           alt={`Gambar ${idx + 1}`}
                           className="w-full h-40 object-cover"
                           loading="lazy"
