@@ -194,14 +194,10 @@ class CommandCenter:
             # Add relevant memories for personalization
             mem_results = self.memory.recall(message, limit=3)
             if mem_results:
-                context += "
-
-## Relevant Memories:
-"
+                context += "\n\n## Relevant Memories:\n"
                 for m in mem_results:
                     if m.get('score', 0) > 0.1:
-                        context += f"- [{m.get('topic', 'general')}] {m.get('content', '')[:100]}
-"
+                        context += f"- [{m.get('topic', 'general')}] {m.get('content', '')[:100]}\n"
         else:
             context = ""
 
@@ -273,7 +269,8 @@ class CommandCenter:
             r"\b(pdf|generate.*pdf|hantar.*telegram|send.*telegram|"
             r"send.*file|upload|download|report.*pdf|laporan.*pdf|"
             r"scan|pentest|recon|dns.*lookup|port.*scan|vuln|xss|sqli|security|"
-            r"task|tugas|buat.*task|create.*task|add.*task|assign.*task)\b", _re.I)
+            r"task|tugas|buat.*task|create.*task|add.*task|assign.*task|"
+            r"gambar|image|photo|pic|cari.*gambar)\b", _re.I)
         if _tool_triggers.search(message):
             route = "reflex"
 
@@ -323,6 +320,7 @@ class CommandCenter:
             "intent": intent,
             "cached": cache_check.get("should_skip", False),
             "tokens_saved": cache_check.get("tokens_saved", 0),
+            "images": result.get("images", []),
         }
 
     async def _reflex(self, message: str, context: str,
@@ -420,6 +418,110 @@ class CommandCenter:
                 return {"text": f"✅ PDF dijana!\n📄 {pdf_path}\n\n{response[:400]}", "agent": "reflex"}
             except Exception as e:
                 return {"text": f"❌ PDF error: {str(e)}", "agent": "reflex"}
+
+        # ── INTENT: image search (real images via Openverse) ──
+        img_kw = bool(re.search(r'(gambar|image|photo|pic|paparkan|muka depan)', msg_lower))
+
+        # Follow-up detection: short message right after an image search
+        is_followup = False
+        if not img_kw and self.memory:
+            try:
+                hist = self.memory.get_context(conv_id) or []
+                recent = [h.get("content", "") for h in hist[-4:]]
+                marker_hit = any("gambar" in c and "untuk anda" in c for c in recent)
+                convs = getattr(self, "_img_convs", {})
+                fresh = (conv_id in convs and (__import__("time").time() - convs[conv_id]) < 600)
+                if (marker_hit or fresh) and len(message.split()) <= 10:
+                    is_followup = True
+            except Exception:
+                pass
+
+        if img_kw or is_followup:
+            self._img_convs = getattr(self, "_img_convs", {})
+            self._img_convs[conv_id] = __import__("time").time()
+            # ---- build clean search query ----
+            q = message
+            # extract count first
+            m_num = re.search(r'(?:sebanyak\s*)?(\d+)\s*(?:keping|bijak|buah)?', q)
+            num = min(int(m_num.group(1)), 6) if m_num else 4
+            # strip number + quantity words
+            q = re.sub(r'(sebanyak\s*)?\d+\s*(keping|bijak|buah)?\s*', ' ', q)
+            cmd_words = [
+                "suruh agent editor", "agent editor", "editor agent", "agent",
+                "carikan saya", "carikan", "cari", "search", "find", "show me",
+                "show", "tolong", "please", "bagi saya", "bagi", "say",
+                "nak", "saya nak", "dapatkan", "paparkan dalam chat ini",
+                "paparkan di sini", "paparkan sini", "paparkan", "dalam chat ini",
+                "di dalam chat ini", "chat ini", "disini", "di sini", "sini", "here", "sila", "kepada saya",
+                "kepada", "saya", "aku", "anda", "kami", "die", "dia",
+                "dalam pinterest", "di pinterest", "pinterest",
+                "gambar", "image", "photo", "pic", "keping", "buah", "dan",
+                "ke telegram", "telegram",
+                "dalam", "di dalam", "pada", "untuk saya", "untuk",
+                "sebanyak", "banyak", "lagi", "juga", "juga", "je", "sahaja",
+            ]
+            for w in cmd_words:
+                pat = "(?:^| )" + re.escape(w) + "(?=$| )"
+                q = re.sub(pat, " ", q, flags=re.IGNORECASE)
+            q = re.sub(r'\s+', ' ', q).strip()
+            if len(q) < 2:
+                q = "cute cat"
+            # common BM -> EN boost (Openverse understands BM too, EN gives more results)
+            translations = [
+                ("anak kucing", "kitten"), ("kucing", "cat"),
+                ("anjing", "dog"), ("burung", "bird"),
+                ("bunga", "flower"), ("kereta", "car"),
+                ("rumah", "house"), ("pantai", "beach"),
+                ("gunung", "mountain"), ("makanan", "food"),
+                ("pemandangan", "landscape"),
+            ]
+            en_q = None
+            for bm, en in translations:
+                if bm in q.lower():
+                    en_q = q.lower().replace(bm, en)
+                    break
+
+            display_q = q if q else message[:40]
+
+            from agents.editor_agent import EditorAgent
+            editor = EditorAgent(config=self.config, memory=self.memory,
+                                 model_router=self.model,
+                                 token_juice=self.token_juice)
+
+            imgs = []
+            seen = set()
+            ordered = []
+            for x in ([q] if q else []) + ([en_q] if en_q else []):
+                if x not in seen:
+                    seen.add(x)
+                    ordered.append(x)
+            queries = ordered
+            for attempt_q in queries:
+                res = await editor._pinterest_search(attempt_q, num)
+                imgs = res.get("images", []) if res.get("ok") else []
+                if imgs:
+                    break
+
+            if not imgs and queries:
+                # fallback: longest significant word only
+                toks = [t for t in q.split() if len(t) >= 3]
+                if toks:
+                    long_tok = max(toks, key=len)
+                    res = await editor._pinterest_search(long_tok, num)
+                    imgs = res.get("images", [])[:num] if res.get("ok") else []
+                    display_q = long_tok
+
+            imgs = imgs[:num]
+            if imgs:
+                msg_text = (
+                    "Dapat " + str(len(imgs)) + " gambar '" +
+                    str(display_q) + "' untuk anda:")
+                return {"text": msg_text, "agent": "editor", "images": imgs}
+            return {
+                "text": "Maaf, tiada gambar sesuai ditemui untuk '" +
+                        str(display_q) + "'. Cuba kata kunci lain.",
+                "agent": "editor", "images": []}
+
 
         # ── INTENT: security scan ──
         wants_security = bool(re.search(r'\b(scan|pentest|pantest|recon|dns.*lookup|port.*scan|vuln|xss|sqli|security|celah|keselamatan)\b', msg_lower))
