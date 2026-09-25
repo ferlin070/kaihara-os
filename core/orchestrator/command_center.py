@@ -9,6 +9,7 @@ from typing import Any
 
 from agents.base_agent import BaseAgent
 from core.orchestrator.model_router import ModelRouter
+from core.orchestrator.orchestrator_brain import brain as orchestrator_brain
 from core.orchestrator.intent_parser import IntentParser
 
 
@@ -190,6 +191,13 @@ class CommandCenter:
         if self.memory:
             self.memory.add_context(conv_id, "user", message)
             context = self.memory.super_context(message)
+            # Add relevant memories for personalization
+            mem_results = self.memory.recall(message, limit=3)
+            if mem_results:
+                context += "\n\n## Relevant Memories:\n"
+                for m in mem_results:
+                    if m.get('score', 0) > 0.1:
+                        context += f"- [{m.get('topic', 'general')}] {m.get('content', '')[:100]}\n"
         else:
             context = ""
 
@@ -216,6 +224,7 @@ class CommandCenter:
                     intent = await self.intent_parser.parse(clean_q)
                     # 1) Get the actual AI answer using normal pipeline
                     route = await self.split_brain.decide(intent)
+
                     context_tg = (self.memory.super_context(clean_q)
                                   if self.memory else "")
                     if route == "deep":
@@ -253,6 +262,17 @@ class CommandCenter:
                 pass  # fall through to normal routing
 
         route = await self.split_brain.decide(intent)
+
+        # Force reflex route for tool-capable tasks (PDF, Telegram, file ops)
+        import re as _re
+        _tool_triggers = _re.compile(
+            r"\b(pdf|generate.*pdf|hantar.*telegram|send.*telegram|"
+            r"send.*file|upload|download|report.*pdf|laporan.*pdf|"
+            r"scan|pentest|recon|dns.*lookup|port.*scan|vuln|xss|sqli|security|"
+            r"task|tugas|buat.*task|create.*task|add.*task|assign.*task|"
+            r"gambar|image|photo|pic|cari.*gambar)\b", _re.I)
+        if _tool_triggers.search(message):
+            route = "reflex"
 
         if cache_check.get("should_skip") and route != "reflex":
             result = {
@@ -300,29 +320,525 @@ class CommandCenter:
             "intent": intent,
             "cached": cache_check.get("should_skip", False),
             "tokens_saved": cache_check.get("tokens_saved", 0),
+            "images": result.get("images", []),
         }
 
     async def _reflex(self, message: str, context: str,
                        conv_id: str) -> dict:
-        """Fast lane: simple questions answered directly."""
+        """Fast lane: simple questions answered directly. Intent-based tool execution."""
+        import os, re, json, logging
+        from pathlib import Path
+        _log = logging.getLogger("kaihara.reflex")
+        # Use agent-specific model for reflex
+        reflex_model = self.model.agent_models.get("reflex", self.model.default)
+
         system = self._kaihara_system_prompt()
         if context:
             system = f"{system}\n\n{context}"
+
         conv_history = ""
         if self.memory:
             history = self.memory.get_context(conv_id)
             if history:
                 conv_history = "\n".join(
-                    f"{m['role']}: {m['content']}" for m in history[-10:]
+                    f"{m['role']}: {m['content'][:200]}" for m in history[-5:]
                 )
+                if len(conv_history) > 2000:
+                    conv_history = conv_history[-2000:]
         prompt = message
         if conv_history:
             prompt = f"Conversation history:\n{conv_history}\n\nUser: {message}"
-        response = await self.model.complete(
+
+        # ── INTENT DETECTION: PDF + Telegram ──
+        msg_lower = message.lower()
+        wants_pdf = bool(re.search(r'\b(pdf|report|laporan)\b', msg_lower))
+        wants_telegram = bool(re.search(r'\b(telegram|tg|hantar.*telegram|send.*telegram)\b', msg_lower))
+        wants_web = bool(re.search(r'\b(search|cari|google|web|research)\b', msg_lower))
+
+        # ── EXECUTE TOOLS DIRECTLY ──
+        if wants_pdf and wants_telegram:
+            try:
+                os.chdir("/opt/kaihara-os")
+                # First get AI content
+                response = await self.model.complete(model=reflex_model, 
+                    system=system,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                # Generate PDF
+                from core.tools.pdf_generator import generate_pdf_report
+                from core.tools.notify_tools import send_telegram_document
+                blocks = self._parse_md_to_blocks(response)
+                pdf_path = generate_pdf_report(
+                    title=message[:60],
+                    content=blocks,
+                    subtitle="Ghazwah Group — Kaihara OS",
+                    output_filename=f"report_{message[:30].lower().replace(' ', '_')}"
+                )
+                # Send to Telegram
+                doc_result = send_telegram_document(
+                    file_path=pdf_path,
+                    caption=f"📊 {message[:100]}"
+                )
+                if doc_result.get("ok"):
+                    return {"text": f"✅ PDF telah dijana dan dihantar ke Telegram!\n📄 {pdf_path}", "agent": "reflex"}
+                else:
+                    err_msg = doc_result.get("error", "unknown")
+                    return {"text": f"⚠️ PDF dijana tapi gagal hantar: {err_msg} | {pdf_path}", "agent": "reflex"}
+            except Exception as e:
+                _log.error(f"PDF+TG error: {e}")
+                return {"text": f"❌ PDF error: {str(e)}", "agent": "reflex"}
+
+        if wants_telegram and not wants_pdf:
+            try:
+                response = await self.model.complete(model=reflex_model, 
+                    system=system,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                from core.tools.notify_tools import send_telegram_message
+                result = send_telegram_message(response)
+                if result.get("ok"):
+                    return {"text": f"✅ Dihantar ke Telegram!\n\n{response[:400]}", "agent": "reflex"}
+                return {"text": response, "agent": "reflex"}
+            except Exception as e:
+                return {"text": f"❌ Telegram error: {str(e)}", "agent": "reflex"}
+
+        if wants_pdf and not wants_telegram:
+            try:
+                response = await self.model.complete(model=reflex_model, 
+                    system=system,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                from core.tools.pdf_generator import generate_pdf_report
+                blocks = self._parse_md_to_blocks(response)
+                pdf_path = generate_pdf_report(
+                    title=message[:60],
+                    content=blocks,
+                    subtitle="Ghazwah Group — Kaihara OS"
+                )
+                return {"text": f"✅ PDF dijana!\n📄 {pdf_path}\n\n{response[:400]}", "agent": "reflex"}
+            except Exception as e:
+                return {"text": f"❌ PDF error: {str(e)}", "agent": "reflex"}
+
+        # ── INTENT: image search (real images via Openverse) ──
+        img_kw = bool(re.search(r'(gambar|image|photo|pic|paparkan|muka depan)', msg_lower))
+
+        # Follow-up detection: short message right after an image search
+        is_followup = False
+        if not img_kw and self.memory:
+            try:
+                hist = self.memory.get_context(conv_id) or []
+                recent = [h.get("content", "") for h in hist[-4:]]
+                marker_hit = any("gambar" in c and "untuk anda" in c for c in recent)
+                convs = getattr(self, "_img_convs", {})
+                fresh = (conv_id in convs and (__import__("time").time() - convs[conv_id]) < 600)
+                if (marker_hit or fresh) and len(message.split()) <= 10:
+                    is_followup = True
+            except Exception:
+                pass
+
+        if img_kw or is_followup:
+            self._img_convs = getattr(self, "_img_convs", {})
+            self._img_convs[conv_id] = __import__("time").time()
+            # ---- build clean search query ----
+            q = message
+            # extract count first
+            m_num = re.search(r'(?:sebanyak\s*)?(\d+)\s*(?:keping|bijak|buah)?', q)
+            num = min(int(m_num.group(1)), 6) if m_num else 4
+            # strip number + quantity words
+            q = re.sub(r'(sebanyak\s*)?\d+\s*(keping|bijak|buah)?\s*', ' ', q)
+            cmd_words = [
+                "suruh agent editor", "agent editor", "editor agent", "agent",
+                "carikan saya", "carikan", "cari", "search", "find", "show me",
+                "show", "tolong", "please", "bagi saya", "bagi", "say",
+                "nak", "saya nak", "dapatkan", "paparkan dalam chat ini",
+                "paparkan di sini", "paparkan sini", "paparkan", "dalam chat ini",
+                "di dalam chat ini", "chat ini", "disini", "di sini", "sini", "here", "sila", "kepada saya",
+                "kepada", "saya", "aku", "anda", "kami", "die", "dia",
+                "dalam pinterest", "di pinterest", "pinterest",
+                "gambar", "image", "photo", "pic", "keping", "buah", "dan",
+                "ke telegram", "telegram",
+                "dalam", "di dalam", "pada", "untuk saya", "untuk",
+                "sebanyak", "banyak", "lagi", "juga", "juga", "je", "sahaja",
+            ]
+            for w in cmd_words:
+                pat = "(?:^| )" + re.escape(w) + "(?=$| )"
+                q = re.sub(pat, " ", q, flags=re.IGNORECASE)
+            q = re.sub(r'\s+', ' ', q).strip()
+            if len(q) < 2:
+                q = "cute cat"
+            # common BM -> EN boost (Openverse understands BM too, EN gives more results)
+            translations = [
+                ("anak kucing", "kitten"), ("kucing", "cat"),
+                ("anjing", "dog"), ("burung", "bird"),
+                ("bunga", "flower"), ("kereta", "car"),
+                ("rumah", "house"), ("pantai", "beach"),
+                ("gunung", "mountain"), ("makanan", "food"),
+                ("pemandangan", "landscape"),
+            ]
+            en_q = None
+            for bm, en in translations:
+                if bm in q.lower():
+                    en_q = q.lower().replace(bm, en)
+                    break
+
+            display_q = q if q else message[:40]
+
+            from agents.editor_agent import EditorAgent
+            editor = EditorAgent(config=self.config, memory=self.memory,
+                                 model_router=self.model,
+                                 token_juice=self.token_juice)
+
+            imgs = []
+            seen = set()
+            ordered = []
+            for x in ([q] if q else []) + ([en_q] if en_q else []):
+                if x not in seen:
+                    seen.add(x)
+                    ordered.append(x)
+            queries = ordered
+            for attempt_q in queries:
+                res = await editor._pinterest_search(attempt_q, num)
+                imgs = res.get("images", []) if res.get("ok") else []
+                if imgs:
+                    break
+
+            if not imgs and queries:
+                # fallback: longest significant word only
+                toks = [t for t in q.split() if len(t) >= 3]
+                if toks:
+                    long_tok = max(toks, key=len)
+                    res = await editor._pinterest_search(long_tok, num)
+                    imgs = res.get("images", [])[:num] if res.get("ok") else []
+                    display_q = long_tok
+
+            imgs = imgs[:num]
+            if imgs:
+                msg_text = (
+                    "Dapat " + str(len(imgs)) + " gambar '" +
+                    str(display_q) + "' untuk anda:")
+                return {"text": msg_text, "agent": "editor", "images": imgs}
+            return {
+                "text": "Maaf, tiada gambar sesuai ditemui untuk '" +
+                        str(display_q) + "'. Cuba kata kunci lain.",
+                "agent": "editor", "images": []}
+
+
+        # ── INTENT: security scan ──
+        wants_security = bool(re.search(r'\b(scan|pentest|pantest|recon|dns.*lookup|port.*scan|vuln|xss|sqli|security|celah|keselamatan)\b', msg_lower))
+        wants_pentest = bool(re.search(r'\b(pentest|pantest|penetration|full.*scan|full.*recon)\b', msg_lower))
+
+        if wants_security:
+            import re as _re
+            target_match = _re.search(r'([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,})', message)
+            if target_match:
+                target = target_match.group(1)
+                try:
+                    import socket
+                    scan_results = []
+                    
+                    if wants_pentest:
+                        scan_results.append(f"🛡️ **Penetration Test: {target}**\n")
+                    else:
+                        scan_results.append(f"🔍 **Security Scan: {target}**\n")
+                    
+                    # DNS Lookup
+                    try:
+                        ip = socket.gethostbyname(target)
+                        scan_results.append(f"✅ DNS: {target} → {ip}")
+                    except Exception as e:
+                        scan_results.append(f"❌ DNS failed: {e}")
+                        ip = None
+                    
+                    # Port scan - more ports for pentest
+                    import asyncio
+                    if wants_pentest:
+                        ports_to_scan = list(range(1, 1001))  # Full 1-1000 for pentest
+                    else:
+                        ports_to_scan = [80, 443, 22, 21, 25, 53, 8080, 3306]
+                    
+                    async def quick_port_scan(host, ports):
+                        open_ports = []
+                        async def check_port(port):
+                            try:
+                                _, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=0.5)
+                                writer.close()
+                                await writer.wait_closed()
+                                return port
+                            except: return None
+                        tasks = [check_port(p) for p in ports]
+                        results = await asyncio.gather(*tasks)
+                        return [p for p in results if p is not None]
+                    
+                    if ip:
+                        open_ports = await quick_port_scan(ip, ports_to_scan)
+                        if open_ports:
+                            scan_results.append(f"✅ Open ports ({len(open_ports)}): {', '.join(map(str, open_ports[:20]))}" + ("..." if len(open_ports) > 20 else ""))
+                        else:
+                            scan_results.append("⚠️ No common ports open")
+                    
+                    # HTTP/HTTPS check
+                    try:
+                        import httpx
+                        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                            r = await client.get(f"https://{target}")
+                            server = r.headers.get('server', 'unknown')
+                            scan_results.append(f"✅ HTTPS: {r.status_code} | Server: {server}")
+                            # Check security headers
+                            headers = r.headers
+                            if 'strict-transport-security' in headers:
+                                scan_results.append(f"  ✓ HSTS enabled")
+                            if 'x-content-type-options' in headers:
+                                scan_results.append(f"  ✓ X-Content-Type-Options: {headers['x-content-type-options']}")
+                            if 'x-frame-options' in headers:
+                                scan_results.append(f"  ✓ X-Frame-Options: {headers['x-frame-options']}")
+                            else:
+                                scan_results.append(f"  ✗ Missing X-Frame-Options")
+                    except Exception as e:
+                        scan_results.append(f"⚠️ HTTPS: {str(e)[:50]}")
+                    
+                    try:
+                        import httpx
+                        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                            r = await client.get(f"http://{target}")
+                            scan_results.append(f"✅ HTTP: {r.status_code} | Server: {r.headers.get('server', 'unknown')}")
+                    except Exception as e:
+                        scan_results.append(f"⚠️ HTTP: {str(e)[:50]}")
+                    
+                    # Subdomain enumeration for pentest
+                    if wants_pentest:
+                        common_subs = ['www', 'mail', 'ftp', 'admin', 'api', 'dev', 'staging', 'test', 'blog', 'shop']
+                        found_subs = []
+                        for sub in common_subs:
+                            try:
+                                subdomain = f"{sub}.{target}"
+                                socket.gethostbyname(subdomain)
+                                found_subs.append(subdomain)
+                            except: pass
+                        if found_subs:
+                            scan_results.append(f"✅ Subdomains found: {', '.join(found_subs[:10])}")
+                    
+                    scan_result = "\n".join(scan_results)
+                    return {"text": scan_result, "agent": "security"}
+                except Exception as e:
+                    return {"text": f"❌ Scan error: {str(e)}", "agent": "security"}
+            else:
+                return {"text": "⚠️ Sila specify target domain (contoh: scan example.com)", "agent": "security"}
+
+        # ── INTENT: task creation ──
+        wants_task = bool(re.search(r'\b(task|tugas|buat.*task|create.*task|add.*task|assign.*task)\b', msg_lower))
+
+        if wants_task:
+            task_title = message.strip()
+            for prefix in ["buat task", "create task", "add task", "task baru", "new task", "assign task"]:
+                if task_title.lower().startswith(prefix):
+                    task_title = task_title[len(prefix):].strip()
+                    break
+            if not task_title:
+                task_title = message[:100]
+            try:
+                import hashlib
+                from datetime import datetime
+                task_id = f"T{hashlib.sha256(datetime.now().isoformat().encode()).hexdigest()[:8]}"
+                planning = getattr(self, '_planning', None)
+                if planning:
+                    task = {
+                        "id": task_id,
+                        "title": task_title,
+                        "description": f"Created from chat: {message[:200]}",
+                        "phase": "General",
+                        "status": "todo",
+                        "complexity": "medium",
+                    }
+                    planning.tracker.save_tasks([task])
+                    return {"text": f"✅ Task created: **{task_title}**\n📋 ID: {task_id}\n📊 Status: todo\n\nTask will appear in Dashboard → Task Board.", "agent": "kaihara"}
+                else:
+                    return {"text": "⚠️ Planning pipeline not initialized", "agent": "kaihara"}
+            except Exception as e:
+                return {"text": f"❌ Task error: {str(e)}", "agent": "kaihara"}
+
+        # ── INTENT: system/agent queries ──
+        wants_agent_info = bool(re.search(r'\b(agent|fleet|agent.*bawah|di bawah|tools.*ada|skills|capabiliti)\b', msg_lower))
+        wants_channel_info = bool(re.search(r'\b(whatsapp|gmail|email|telegram|channel|saluran)\b', msg_lower))
+        wants_system_info = bool(re.search(r'\b(server|dashboard|system|status|monitor|daemon|online|offline)\b', msg_lower))
+
+        if wants_agent_info:
+            # Answer about fleet agents from brain context
+            agent_info = orchestrator_brain.get_fleet_summary()
+            response = await self.model.complete(model=reflex_model, 
+                system=system,
+                messages=[{"role": "user", "content": f"{prompt}\n\n[AGENT DATA]\n{agent_info}"}]
+            )
+            return {"text": response, "agent": "kaihara"}
+
+        if wants_channel_info:
+            # Answer about communication channels
+            channel_info = orchestrator_brain.get_channel_summary()
+            response = await self.model.complete(model=reflex_model, 
+                system=system,
+                messages=[{"role": "user", "content": f"{prompt}\n\n[CHANNEL DATA]\n{channel_info}"}]
+            )
+            return {"text": response, "agent": "kaihara"}
+
+        if wants_system_info:
+            # Get live system status
+            try:
+                import httpx
+                r = httpx.get("http://localhost:7000/api/monitor/servers", timeout=10)
+                servers = r.json()
+                sys_info = orchestrator_brain.get_system_summary()
+                server_data = json.dumps(servers, indent=2, default=str)[:2000]
+                response = await self.model.complete(model=reflex_model, 
+                    system=system,
+                    messages=[{"role": "user", "content": f"{prompt}\n\n[SYSTEM DATA]\n{sys_info}\n\n[LIVE SERVER STATUS]\n{server_data}"}]
+                )
+                return {"text": response, "agent": "kaihara"}
+            except Exception:
+                sys_info = orchestrator_brain.get_system_summary()
+                response = await self.model.complete(model=reflex_model, 
+                    system=system,
+                    messages=[{"role": "user", "content": f"{prompt}\n\n[SYSTEM DATA]\n{sys_info}"}]
+                )
+                return {"text": response, "agent": "kaihara"}
+
+        # ── DEFAULT: plain text response ──
+        response = await self.model.complete(model=reflex_model, 
             system=system,
             messages=[{"role": "user", "content": prompt}]
         )
-        return {"text": response, "agent": "reflex"}
+        # Strip thinking process from model response
+        try:
+            from core.tools.notify_tools import _strip_thinking
+            stripped = _strip_thinking(response)
+            if stripped:
+                response = stripped
+        except: pass
+        # Track last menu for context
+        if "Langkah Seterusnya:" in response or "Pilih" in response:
+            if hasattr(self, '_last_menu'):
+                self._last_menu = response
+        return {"text": response, "agent": "kaihara"}
+
+    def _parse_md_to_blocks(self, md: str) -> list:
+        """Parse markdown text into PDF content blocks."""
+        blocks = []
+        for line in md.split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("# "):
+                blocks.append({"type": "heading", "text": stripped[2:], "level": 2})
+            elif stripped.startswith("## "):
+                blocks.append({"type": "heading", "text": stripped[3:], "level": 3})
+            elif stripped.startswith("### "):
+                blocks.append({"type": "heading", "text": stripped[4:], "level": 4})
+            elif stripped.startswith("- ") or stripped.startswith("* "):
+                if not blocks or blocks[-1].get("type") != "bullet":
+                    blocks.append({"type": "bullet", "items": []})
+                blocks[-1]["items"].append(stripped[2:])
+            elif stripped.startswith("> "):
+                blocks.append({"type": "highlight", "text": stripped[2:]})
+            elif stripped.startswith("| ") and "---" not in stripped:
+                cells = [c.strip() for c in stripped.split("|")[1:-1]]
+                if not blocks or blocks[-1].get("type") != "table":
+                    blocks.append({"type": "table", "headers": cells, "rows": []})
+                else:
+                    blocks[-1]["rows"].append(cells)
+            else:
+                blocks.append({"type": "paragraph", "text": stripped})
+        blocks = [b for b in blocks if not (b.get("type") == "table" and not b.get("rows"))]
+        return blocks if blocks else [{"type": "paragraph", "text": md}]
+
+
+    async def _execute_generate_and_send_pdf(self, args: dict) -> str:
+        """Generate PDF from markdown and send to Telegram."""
+        import os
+        os.chdir("/opt/kaihara-os")
+        from core.tools.pdf_generator import generate_pdf_report
+        from core.tools.notify_tools import send_telegram_document
+        from pathlib import Path
+
+        title = args.get("title", "Report")
+        content_md = args.get("content_md", "")
+
+        # Parse markdown to content blocks
+        blocks = []
+        for line in content_md.split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("# "):
+                blocks.append({"type": "heading", "text": stripped[2:], "level": 2})
+            elif stripped.startswith("## "):
+                blocks.append({"type": "heading", "text": stripped[3:], "level": 3})
+            elif stripped.startswith("### "):
+                blocks.append({"type": "heading", "text": stripped[4:], "level": 4})
+            elif stripped.startswith("- ") or stripped.startswith("* "):
+                if not blocks or blocks[-1].get("type") != "bullet":
+                    blocks.append({"type": "bullet", "items": []})
+                blocks[-1]["items"].append(stripped[2:])
+            elif stripped.startswith("> "):
+                blocks.append({"type": "highlight", "text": stripped[2:]})
+            elif stripped.startswith("| ") and "---" not in stripped:
+                cells = [c.strip() for c in stripped.split("|")[1:-1]]
+                if not blocks or blocks[-1].get("type") != "table":
+                    blocks.append({"type": "table", "headers": cells, "rows": []})
+                else:
+                    blocks[-1]["rows"].append(cells)
+            else:
+                blocks.append({"type": "paragraph", "text": stripped})
+
+        if not blocks:
+            blocks = [{"type": "paragraph", "text": content_md}]
+
+        # Clean empty tables
+        blocks = [b for b in blocks if not (b.get("type") == "table" and not b.get("rows"))]
+
+        pdf_path = generate_pdf_report(
+            title=title,
+            content=blocks,
+            subtitle="Ghazwah Group — Kaihara OS",
+            output_filename=f"report_{title[:30].lower().replace(' ', '_')}"
+        )
+
+        # Send to Telegram
+        result = send_telegram_document(
+            file_path=pdf_path,
+            caption=f"📊 {title[:100]}"
+        )
+
+        if result.get("ok"):
+            return f"✅ PDF dijana dan dihantar ke Telegram!\n📄 {pdf_path}"
+        else:
+            return f"⚠️ PDF dijana tapi gagal hantar: {result.get('error', 'unknown')}\n📄 {pdf_path}"
+
+    async def _execute_send_telegram(self, args: dict) -> str:
+        """Send text message to Telegram."""
+        from core.tools.notify_tools import send_telegram_message
+        message = args.get("message", "")
+        result = send_telegram_message(message)
+        if result.get("ok"):
+            return f"✅ Mesej dihantar ke Telegram!"
+        return f"⚠️ Gagal hantar: {result.get('error', 'unknown')}"
+
+    async def _execute_generate_pdf(self, args: dict) -> str:
+        """Generate PDF without sending."""
+        import os
+        os.chdir("/opt/kaihara-os")
+        from core.tools.pdf_generator import generate_pdf_report
+        title = args.get("title", "Report")
+        content_md = args.get("content_md", "")
+        blocks = [{"type": "paragraph", "text": content_md}]
+        pdf_path = generate_pdf_report(title=title, content=blocks)
+        return f"✅ PDF dijana: {pdf_path}"
+
+    async def _execute_web_search(self, args: dict) -> str:
+        """Web search."""
+        from core.tools.web_tools import web_search
+        query = args.get("query", "")
+        result = web_search(query)
+        if isinstance(result, dict):
+            return json.dumps(result, indent=2, default=str)
+        return str(result)
 
     async def _workflow(self, intent: dict) -> dict:
         """Workflow lane: trigger or propose automation."""
@@ -428,16 +944,18 @@ class CommandCenter:
         }
 
     def _kaihara_system_prompt(self) -> str:
-        """Load Kaihara SOUL.md as system prompt."""
+        """Load Kaihara SOUL.md + orchestrator context as system prompt."""
         soul_path = self.config.get("soul_dir", "config/soul")
         import os
         path = os.path.join(soul_path, "kaihara.md")
         try:
             with open(path, encoding="utf-8") as f:
-                return f.read()
+                soul = f.read()
         except FileNotFoundError:
-            return ("You are Kaihara, a personal AI assistant. "
+            soul = ("You are Kaihara, a personal AI assistant. "
                     "Be concise, proactive, and action-oriented.")
+        # Inject orchestrator context
+        return soul + "\n\n" + orchestrator_brain.get_full_context()
 
     def _format_response(self, result: dict, route: str) -> str:
         if "text" in result:

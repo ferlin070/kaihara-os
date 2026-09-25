@@ -60,32 +60,31 @@ export default function AgentMap() {
   const animRef = useRef<number>(0)
   const assetsLoadedRef = useRef(false)
 
-  // Load all sprite images
+  // Load sprite images lazily (after 1s delay)
   useEffect(() => {
     if (assetsLoadedRef.current) return
-    const imgs: HTMLImageElement[] = []
-    let loaded = 0
-    const total = 8
-
-    const onLoad = () => { loaded++; if (loaded >= total) assetsLoadedRef.current = true }
-
-    for (let i = 0; i < 6; i++) {
-      const img = new Image()
-      img.onload = onLoad
-      img.src = `/assets/characters/char_${i}.png`
-      imgs.push(img)
-    }
-    charImgsRef.current = imgs
-
-    const floor = new Image()
-    floor.onload = onLoad
-    floor.src = '/assets/floors/floor_0.png'
-    floorImgRef.current = floor
-
-    const desk = new Image()
-    desk.onload = onLoad
-    desk.src = '/assets/furniture/DESK/DESK_FRONT.png'
-    deskImgRef.current = desk
+    const timer = setTimeout(() => {
+      const imgs: HTMLImageElement[] = []
+      let loaded = 0
+      const total = 8
+      const onLoad = () => { loaded++; if (loaded >= total) assetsLoadedRef.current = true }
+      for (let i = 0; i < 6; i++) {
+        const img = new Image()
+        img.onload = onLoad
+        img.src = `/assets/characters/char_${i}.png`
+        imgs.push(img)
+      }
+      charImgsRef.current = imgs
+      const floor = new Image()
+      floor.onload = onLoad
+      floor.src = '/assets/floors/floor_0.png'
+      floorImgRef.current = floor
+      const desk = new Image()
+      desk.onload = onLoad
+      desk.src = '/assets/furniture/DESK/DESK_FRONT.png'
+      deskImgRef.current = desk
+    }, 1000)
+    return () => clearTimeout(timer)
   }, [])
 
   // Fetch map state every 500ms (2fps for state, 60fps for rendering)
@@ -95,7 +94,7 @@ export default function AgentMap() {
 
   useEffect(() => {
     fetchState()
-    const i = setInterval(fetchState, 500)
+    const i = setInterval(fetchState, 5000)
     return () => clearInterval(i)
   }, [fetchState])
 

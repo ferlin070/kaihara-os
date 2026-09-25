@@ -71,7 +71,7 @@ export default function DaemonView() {
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 10000) // Refresh every 10s
+    const interval = setInterval(fetchData, 30000) // Refresh every 10s
     return () => clearInterval(interval)
   }, [fetchData])
 

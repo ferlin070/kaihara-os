@@ -42,7 +42,7 @@ export default function MetaPanel() {
 
   useEffect(() => {
     fetchAll()
-    const i = setInterval(fetchAll, 10000)
+    const i = setInterval(fetchAll, 30000)
     return () => clearInterval(i)
   }, [fetchAll])
 

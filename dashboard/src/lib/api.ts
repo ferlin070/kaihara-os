@@ -4,7 +4,7 @@ import React from 'react'
 const getApiBase = () => {
   // If we're on the dashboard domain, use the API domain
   if (window.location.hostname === 'kaihara-ai.nakhodacloud.top') {
-    return 'https://kaihara-api.nakhodacloud.top/api'
+    return '/api'
   }
   // Otherwise use relative path (for local development)
   return '/api'

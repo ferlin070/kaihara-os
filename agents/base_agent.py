@@ -24,7 +24,7 @@ WEB_AGENTS = {"marketing", "research", "kaihara"}
 # PDF / report triggers
 PDF_TRIGGER = re.compile(
     r"\b(pdf|report|laporan|dokumen|document|Invoice|resume|borang|form)\b", re.I)
-PDF_AGENTS = {"kaihara", "marketing", "research"}
+PDF_AGENTS = {"kaihara", "marketing", "research", "deploy", "editor", "meta", "security"}
 
 # Telegram / notification triggers
 TG_TRIGGER = re.compile(
@@ -81,9 +81,12 @@ class BaseAgent:
         # Don't compress SOUL.md — it's the personality
         if context:
             prompt = f"{context}\n\n---\n\n{prompt}"
+        # Use agent-specific model if available
+        agent_model = self.model.agent_models.get(self.AGENT_TYPE, self.model.default)
         response = await self.model.complete(
             system=system,
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            model=agent_model
         )
         return response
 
@@ -202,7 +205,10 @@ class GenericAgent(BaseAgent):
                         in_section = False
 
                 if key_sections:
-                    contents.append(f"[SKILL: {skill_id}]\n" + "\n".join(key_sections[:30]))
+                    skill_text = "\n".join(key_sections[:20])
+                    if len(skill_text) > 2000:
+                        skill_text = skill_text[:2000] + "\n[SKILL TRUNCATED]"
+                    contents.append(f"[SKILL: {skill_id}]\n" + skill_text)
 
         return "\n\n".join(contents)
 
@@ -255,10 +261,13 @@ class GenericAgent(BaseAgent):
 
             full_context = "\n\n".join(
                 x for x in (skill_context, memory_context, web_context) if x)
+            # Hard cap on context to prevent token explosion
+            if len(full_context) > 6000:
+                full_context = full_context[:6000] + "\n[CONTEXT TRUNCATED]"
 
-            # Telegram send: only for pure messaging tasks.
+            # Telegram send: only for pure messaging tasks (skip if PDF requested)
             # Research/web tasks: skip (CommandCenter delivers final answer)
-            if TG_TRIGGER.search(task) and not WEB_TRIGGER.search(task):
+            if TG_TRIGGER.search(task) and not WEB_TRIGGER.search(task) and not PDF_TRIGGER.search(task):
                 st = telegram_status()
                 if st.get("configured"):
                     tg_result = send_telegram_message(f"Kaihara: {task}")
@@ -287,15 +296,52 @@ class GenericAgent(BaseAgent):
             response = await self.think(task, context=full_context)
 
 
-            # PDF generation: generate report and send to Telegram
+            # PDF generation: generate branded report and send to Telegram
             if PDF_TRIGGER.search(task) and self.AGENT_TYPE in PDF_AGENTS:
                 try:
                     from core.tools.pdf_generator import generate_pdf_report
+
+                    # Parse response into structured content blocks
+                    blocks = []
+                    lines = response.split("\n")
+                    for line in lines:
+                        stripped = line.strip()
+                        if not stripped:
+                            blocks.append({"type": "spacer", "height": 3*mm})
+                        elif stripped.startswith("# "):
+                            blocks.append({"type": "heading", "text": stripped[2:], "level": 2})
+                        elif stripped.startswith("## "):
+                            blocks.append({"type": "heading", "text": stripped[3:], "level": 3})
+                        elif stripped.startswith("### "):
+                            blocks.append({"type": "heading", "text": stripped[4:], "level": 4})
+                        elif stripped.startswith("| ") and "---" not in stripped:
+                            # Parse table rows
+                            cells = [c.strip() for c in stripped.split("|")[1:-1]]
+                            if not blocks or blocks[-1].get("type") != "table":
+                                blocks.append({"type": "table", "headers": cells, "rows": []})
+                            else:
+                                blocks[-1]["rows"].append(cells)
+                        elif stripped.startswith("- ") or stripped.startswith("* "):
+                            if not blocks or blocks[-1].get("type") != "bullet":
+                                blocks.append({"type": "bullet", "items": []})
+                            blocks[-1]["items"].append(stripped[2:])
+                        elif stripped.startswith("> "):
+                            blocks.append({"type": "highlight", "text": stripped[2:]})
+                        elif stripped.startswith("---"):
+                            blocks.append({"type": "divider"})
+                        else:
+                            blocks.append({"type": "paragraph", "text": stripped})
+
+                    if not blocks:
+                        blocks = [{"type": "paragraph", "text": response}]
+
+                    # Clean up empty tables
+                    blocks = [b for b in blocks if not (b.get("type") == "table" and not b.get("rows"))]
+
                     pdf_path = generate_pdf_report(
                         title=task[:60],
-                        content=[
-                            {"type": "paragraph", "text": response},
-                        ],
+                        content=blocks,
+                        subtitle=f"Route: {self.AGENT_TYPE} | Kaihara OS",
                         output_filename=f"report_{self.AGENT_TYPE}"
                     )
                     # Send to Telegram
@@ -303,7 +349,7 @@ class GenericAgent(BaseAgent):
                     if tg_status.get("configured"):
                         doc_result = send_telegram_document(
                             file_path=pdf_path,
-                            caption=f"📊 Laporan: {task[:100]}"
+                            caption=f"📊 {task[:100]}"
                         )
                         if doc_result.get("ok"):
                             return {
@@ -314,7 +360,8 @@ class GenericAgent(BaseAgent):
                                 "status": "ok",
                             }
                 except Exception as e:
-                    full_context += f"\n[PDF ERROR] {str(e)}"
+                    import traceback
+                    full_context += f"\n[PDF ERROR] {traceback.format_exc()}"
 
             # Store result in memory
             if self.memory:

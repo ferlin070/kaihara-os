@@ -37,7 +37,7 @@ export default function TaskBoard() {
 
   useEffect(() => {
     fetchTasks()
-    const interval = setInterval(fetchTasks, 10000)
+    const interval = setInterval(fetchTasks, 30000)
     return () => clearInterval(interval)
   }, [fetchTasks])
 

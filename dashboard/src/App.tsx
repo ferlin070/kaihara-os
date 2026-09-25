@@ -28,7 +28,7 @@ import {
   type SystemStatus as Status, type Conversation as Conv,
 } from './lib/api'
 
-export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string; provider?: string }
+export type Msg = { role: 'user' | 'kaihara'; text: string; route?: string; provider?: string; images?: Array<{url: string; source?: string; query?: string}> }
 
 const ACTIVE_CONV_KEY = 'kaihara_active_conv'
 
@@ -99,7 +99,7 @@ function AppContent() {
     return () => clearInterval(interval)
   }, [fetchStatus])
 
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (): Promise<void> => {
     try {
       const data = await getConversations()
       setConversations(data.conversations || [])
@@ -132,16 +132,20 @@ function AppContent() {
   }, [messages, activeConvId])
 
   const handleNewChat = async () => {
+    if (isCreatingChat) return
+    setIsCreatingChat(true)
     try {
       const conv = await newConversation('New Chat')
       setActiveConvId(conv.conv_id)
       setMessages([])
-      fetchConversations()
+      await fetchConversations()
       setActiveTab('chat')
     } catch {
       setActiveConvId(`c_local_${Date.now()}`)
       setMessages([])
       setActiveTab('chat')
+    } finally {
+      setIsCreatingChat(false)
     }
   }
 
@@ -172,7 +176,7 @@ function AppContent() {
     setThinking(true)
     try {
       const res = await sendMessage(text, 'dashboard', activeConvId)
-      setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route, provider: (res as any).provider }])
+      setMessages(prev => [...prev, { role: 'kaihara', text: res.response, route: res.route, provider: (res as any).provider, images: (res as any).images }])
       fetchConversations()
     } catch {
       setMessages(prev => [...prev, { role: 'kaihara', text: '[Connection error. Is Kaihara server running on :7000?]' }])
@@ -258,8 +262,8 @@ function AppContent() {
           </div>
         </div>
 
-        {/* Tab Content — flex-1, overflow hidden */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        {/* Tab Content — flex-1, scrollable */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {activeTab === 'chat' && <Conversation messages={messages} thinking={thinking} onSend={handleSend} />}
           {activeTab === 'map' && <AgentMap />}
           {activeTab === 'tasks' && <TaskBoard />}

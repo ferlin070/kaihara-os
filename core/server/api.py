@@ -23,6 +23,7 @@ class ChatResponse(BaseModel):
     intent: dict
     source: str
     provider: str = ""
+    images: list = []
 
 
 def create_app(command_center) -> FastAPI:
@@ -130,6 +131,7 @@ def create_app(command_center) -> FastAPI:
             source=result["source"],
             provider=getattr(command_center.model, "last_provider", "")
             if command_center.model else "",
+            images=result.get("images", []),
         )
 
     @app.post("/api/webhook")
@@ -428,6 +430,26 @@ def create_app(command_center) -> FastAPI:
         if not pipeline:
             return {"error": "Planning pipeline not initialized"}
         return {"tasks": pipeline.get_tasks(prd_id=prd_id, status=status)}
+
+    @app.post("/api/planning/tasks")
+    async def create_task(payload: dict):
+        pipeline = getattr(command_center, "_planning", None)
+        if not pipeline:
+            return {"error": "Planning pipeline not initialized"}
+        import hashlib
+        from datetime import datetime
+        task_id = payload.get("id", f"T{hashlib.sha256(datetime.now().isoformat().encode()).hexdigest()[:8]}")
+        task = {
+            "id": task_id,
+            "title": payload.get("title", "Untitled Task"),
+            "description": payload.get("description", ""),
+            "phase": payload.get("phase", "General"),
+            "status": payload.get("status", "todo"),
+            "complexity": payload.get("complexity", "medium"),
+            "assigned_agent": payload.get("assigned_agent"),
+        }
+        pipeline.tracker.save_tasks([task])
+        return {"created": True, "task_id": task_id, "task": task}
 
     @app.delete("/api/planning/tasks/{task_id}")
     async def delete_task(task_id: str):
@@ -1925,6 +1947,68 @@ Format as JSON with keys: title, body, hashtags, cta"""
     # ============================================================
     # Meta Agent endpoints
     # ============================================================
+
+
+    @app.get("/api/dashboard/status")
+    async def dashboard_status():
+        """Combined endpoint: returns all dashboard sidebar data in ONE call."""
+        import psutil, time
+        from core.tools.system_tools import get_system_stats
+
+        result = {"timestamp": time.time()}
+
+        # System stats (CPU, RAM, disk)
+        try:
+            result["system"] = get_system_stats()
+        except:
+            result["system"] = {}
+
+        # Kernel agents status
+        try:
+            kernel = getattr(command_center, "_kernel", None)
+            if kernel:
+                agents = {}
+                for name, agent in kernel.agents.items():
+                    agents[name] = {
+                        "status": getattr(agent, "status", "idle"),
+                        "speech": getattr(agent, "speech", ""),
+                    }
+                result["kernel"] = agents
+            else:
+                result["kernel"] = {}
+        except:
+            result["kernel"] = {}
+
+        # Channels status
+        try:
+            channels = {}
+            mgr = getattr(command_center, "_channel_manager", None)
+            if mgr:
+                result["channels"] = mgr.status()
+            else:
+                result["channels"] = {}
+            result["channels"] = channels
+        except:
+            result["channels"] = {}
+
+        # Meta agent observations
+        try:
+            meta = getattr(command_center, "_meta_agent", None)
+            if meta:
+                result["meta"] = {
+                    "patterns": len(getattr(meta, "patterns", [])),
+                    "suggestions": len(getattr(meta, "suggestions", [])),
+                }
+            else:
+                result["meta"] = {}
+        except:
+            result["meta"] = {}
+
+        # Online status
+        result["kaihara_online"] = True
+
+        return result
+
 
     @app.get("/api/meta/status")
     async def meta_status():

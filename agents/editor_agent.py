@@ -5,7 +5,7 @@ Integrates FFmpeg, MoviePy, Pillow, Pexels API, Edge TTS, Google Drive, Pinteres
 
 import os
 import re
-from agents.base_agent import BaseAgent
+from agents.base_agent import BaseAgent, GenericAgent
 from core.tools.media_tools import (
     video_probe, video_trim, video_concat, video_overlay,
     video_add_audio, video_add_text, video_add_subtitles,
@@ -31,7 +31,7 @@ from core.tools.google_flow_tools import GoogleFlowTools
 from core.tools.pipeline_tools import VideoPipeline
 
 
-class EditorAgent(BaseAgent):
+class EditorAgent(GenericAgent):
     """Video editing, image generation, and media processing agent."""
 
     AGENT_TYPE = "editor"
@@ -114,7 +114,7 @@ class EditorAgent(BaseAgent):
             result = await self._handle_quote_task(task, ctx)
 
         # Stock media
-        elif any(w in task_lower for w in ["stock", "footage", "pexels"]):
+        elif any(w in task_lower for w in ["stock", "footage", "pexels", "cari gambar", "cari", "gambar", "image", "photo"]):
             result = await self._handle_stock_task(task, ctx)
 
         # Google Drive
@@ -285,13 +285,18 @@ class EditorAgent(BaseAgent):
             output_path=ctx.get("output"))
 
     async def _handle_stock_task(self, task: str, ctx: dict) -> dict:
-        query = ctx.get("query") or task
-        media_type = ctx.get("type", "image")
-        if media_type == "video":
-            return await self._search_stock_video(query,
-                per_page=ctx.get("limit", 10))
-        return await self._search_stock_image(query,
-            per_page=ctx.get("limit", 10))
+        query = task
+        # Clean query
+        for prefix in ["stock", "footage", "pexels", "cari", "gambar", "image", "photo"]:
+            if query.lower().startswith(prefix):
+                query = query[len(prefix):].strip()
+        # Extract number
+        import re
+        num_match = re.search(r'(\d+)', query)
+        num = int(num_match.group(1)) if num_match else 3
+        query = re.sub(r'\d+\s*', '', query).strip()
+        # Use Pinterest tools (working)
+        return await self._pinterest_search(query, num)
 
     async def _handle_gdrive_task(self, task: str, ctx: dict) -> dict:
         action = ctx.get("action", "browse")
@@ -306,8 +311,31 @@ class EditorAgent(BaseAgent):
 
     async def _handle_pinterest_task(self, task: str, ctx: dict) -> dict:
         query = ctx.get("query") or task
-        return await self._pinterest_search(query,
-            limit=ctx.get("limit", 20))
+        # Clean query
+        for prefix in ["pinterest", "pin", "cari", "search", "gambar", "image", "carikan"]:
+            if query.lower().startswith(prefix):
+                query = query[len(prefix):].strip()
+        # Extract number if specified
+        import re
+        num_match = re.search(r'(\d+)', query)
+        num = int(num_match.group(1)) if num_match else 3
+        query = re.sub(r'\d+\s*', '', query).strip()
+        
+        result = await self._pinterest_search(query, num)
+        if result.get("ok"):
+            images = result.get("images", [])
+            if images:
+                # Format results with markdown images for display
+                img_list = []
+                for i, img in enumerate(images[:num], 1):
+                    img_url = img.get('url', '')
+                    img_list.append(f"![Image {i}]({img_url})")
+                return {
+                    "ok": True,
+                    "text": "📸 Dapat " + str(len(images)) + " gambar untuk " + query,
+                }
+            return {"ok": True, "text": f"Tiada gambar ditemui untuk '{query}'", "images": []}
+        return result
 
     async def _handle_ai_image_task(self, task: str, ctx: dict) -> dict:
         prompt = ctx.get("prompt") or task
@@ -785,13 +813,8 @@ class EditorAgent(BaseAgent):
     # ---- Pinterest Tools ----
 
     async def _pinterest_search(self, query: str, limit: int = 100) -> dict:
-        import asyncio as _aio
-        from core.tools.pinterest_tools import search_full
-        target_imgs = max(limit, 100)
-        target_vids = min(30, max(10, limit // 3))
         try:
-            return await _aio.to_thread(
-                search_full, query, target_imgs, target_vids)
+            return await self._pinterest.search_images(query, limit)
         except Exception as e:
             return {"ok": False, "error": str(e)}
 

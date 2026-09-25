@@ -1,401 +1,182 @@
 """
-PDF Generator — Create PDF documents from text, HTML, or structured data.
-Supports invoices, reports, certificates, and custom documents.
+PDF Generator — Professional reports with Kaihara OS + Ghazwah Group branding.
 """
 
 import os
 import logging
 from pathlib import Path
+from datetime import datetime
 from typing import Optional
-from reportlab.lib.pagesizes import A4, letter
+
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch, mm
-from reportlab.lib.colors import HexColor, black, white
+from reportlab.lib.units import mm
+from reportlab.lib.colors import HexColor, white
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    Image, PageBreak, HRFlowable
+    HRFlowable
 )
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.platypus.doctemplate import PageTemplate, BaseDocTemplate, Frame
 
 logger = logging.getLogger("kaihara.pdf_generator")
 
-# Output directory
 OUTPUT_DIR = Path(os.getenv("KAIHARA_OUTPUT_DIR", "outputs/pdfs"))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+PRIMARY = HexColor("#7c3aed")
+PRIMARY_DARK = HexColor("#5b21b6")
+ACCENT = HexColor("#a78bfa")
+BG_LIGHT = HexColor("#f5f3ff")
+TEXT_DARK = HexColor("#1e1b4b")
+TEXT_MED = HexColor("#4c1d95")
+TEXT_LIGHT = HexColor("#6b7280")
+BORDER = HexColor("#e5e7eb")
+WHITE = white
 
-def generate_pdf_report(
-    title: str,
-    content: list[dict],
-    output_filename: Optional[str] = None,
-    author: str = "Kaihara OS",
-    page_size: str = "A4",
-) -> str:
-    """Generate a PDF report from structured content.
-    
-    Args:
-        title: Report title
-        content: List of content blocks, each with 'type' and data
-                 Types: 'heading', 'paragraph', 'list', 'table', 'spacer'
-        output_filename: Custom filename (without .pdf)
-        author: Document author
-        page_size: Page size (A4, letter)
-    
-    Returns:
-        Path to generated PDF file
-    """
-    if not output_filename:
-        output_filename = f"report_{title.lower().replace(' ', '_')}"
-    
-    filepath = OUTPUT_DIR / f"{output_filename}.pdf"
-    
-    # Page size
-    size = A4 if page_size.upper() == "A4" else letter
-    
-    # Create document
-    doc = SimpleDocTemplate(
-        str(filepath),
-        pagesize=size,
-        rightMargin=25*mm,
-        leftMargin=25*mm,
-        topMargin=25*mm,
-        bottomMargin=25*mm,
-    )
-    
-    # Styles
+
+class KaiharaDocTemplate(BaseDocTemplate):
+    def __init__(self, filename, **kwargs):
+        self.report_title = kwargs.pop("report_title", "Report")
+        self.author = kwargs.pop("author", "Kaihara OS")
+        super().__init__(filename, **kwargs)
+        frame = Frame(20*mm, 25*mm, self.width, self.height, id="main")
+        template = PageTemplate(id="main", frames=[frame], onPage=self._draw_header_footer)
+        self.addPageTemplates([template])
+
+    def _draw_header_footer(self, canvas, doc):
+        canvas.saveState()
+        w, h = A4
+        canvas.setFillColor(PRIMARY)
+        canvas.rect(0, h - 22*mm, w, 22*mm, fill=1, stroke=0)
+        canvas.setStrokeColor(ACCENT)
+        canvas.setLineWidth(1)
+        canvas.line(0, h - 22*mm, w, h - 22*mm)
+        canvas.setFillColor(WHITE)
+        canvas.setFont("Helvetica-Bold", 14)
+        canvas.drawString(20*mm, h - 14*mm, "KAIHARA OS")
+        canvas.setFont("Helvetica", 9)
+        canvas.drawString(20*mm, h - 19*mm, "AI Super-Intelligence Platform")
+        canvas.setFont("Helvetica", 8)
+        canvas.drawRightString(w - 20*mm, h - 14*mm, datetime.now().strftime("%d %B %Y"))
+        canvas.drawRightString(w - 20*mm, h - 19*mm, "nakhodacloud.top")
+        canvas.setStrokeColor(BORDER)
+        canvas.setLineWidth(0.5)
+        canvas.line(20*mm, 20*mm, w - 20*mm, 20*mm)
+        canvas.setFillColor(TEXT_LIGHT)
+        canvas.setFont("Helvetica", 7)
+        canvas.drawString(20*mm, 14*mm, "Ghazwah Group — Powered by Kaihara OS")
+        canvas.drawRightString(w - 20*mm, 14*mm, f"Page {doc.page}")
+        canvas.setFillColor(PRIMARY)
+        canvas.circle(w/2, 14*mm, 2, fill=1, stroke=0)
+        canvas.restoreState()
+
+
+def _get_styles():
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(
-        name='CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        spaceAfter=30,
-        textColor=HexColor('#8b5cf6'),
-    ))
-    styles.add(ParagraphStyle(
-        name='CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=16,
-        spaceBefore=20,
-        spaceAfter=10,
-        textColor=HexColor('#1a1a1a'),
-    ))
-    styles.add(ParagraphStyle(
-        name='CustomParagraph',
-        parent=styles['Normal'],
-        fontSize=11,
-        spaceBefore=6,
-        spaceAfter=6,
-        leading=16,
-    ))
-    
-    # Build story
+    styles.add(ParagraphStyle(name="ReportTitle", fontName="Helvetica-Bold", fontSize=22, leading=28, textColor=PRIMARY_DARK, spaceAfter=4*mm))
+    styles.add(ParagraphStyle(name="ReportSubtitle", fontName="Helvetica", fontSize=11, leading=15, textColor=TEXT_LIGHT, spaceAfter=8*mm))
+    styles.add(ParagraphStyle(name="SectionHeading", fontName="Helvetica-Bold", fontSize=14, leading=20, textColor=PRIMARY_DARK, spaceBefore=8*mm, spaceAfter=4*mm))
+    styles.add(ParagraphStyle(name="SubHeading", fontName="Helvetica-Bold", fontSize=11, leading=15, textColor=TEXT_MED, spaceBefore=5*mm, spaceAfter=3*mm))
+    styles.add(ParagraphStyle(name="BodyText2", fontName="Helvetica", fontSize=10, leading=15, textColor=TEXT_DARK, spaceAfter=3*mm, alignment=TA_JUSTIFY))
+    styles.add(ParagraphStyle(name="BulletItem", fontName="Helvetica", fontSize=10, leading=14, textColor=TEXT_DARK, leftIndent=12*mm, bulletIndent=6*mm, spaceAfter=2*mm))
+    styles.add(ParagraphStyle(name="SmallGray", fontName="Helvetica", fontSize=8, leading=11, textColor=TEXT_LIGHT))
+    return styles
+
+
+def _make_section_divider():
+    return HRFlowable(width="100%", thickness=1.5, color=ACCENT, spaceAfter=4*mm, spaceBefore=2*mm)
+
+
+def _make_highlight_box(text, styles):
+    inner = Paragraph(text, styles["BodyText2"])
+    t = Table([[inner]], colWidths=[150*mm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), BG_LIGHT),
+        ("BOX", (0, 0), (-1, -1), 0.5, ACCENT),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    return t
+
+
+def _make_table(headers, rows, col_widths=None):
+    data = [headers] + rows
+    if not col_widths:
+        n = len(headers)
+        col_widths = [150*mm / n] * n
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ("TOPPADDING", (0, 0), (-1, 0), 8),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 1), (-1, -1), 8.5),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
+        ("TOPPADDING", (0, 1), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.5, BORDER),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.5, PRIMARY),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, BG_LIGHT]),
+    ]))
+    return t
+
+
+def generate_pdf_report(title, content, output_filename=None, author="Kaihara OS", subtitle="", page_size="A4"):
+    if not output_filename:
+        safe = "".join(c if c.isalnum() or c in "-_ " else "" for c in title)
+        output_filename = f"report_{safe.lower().replace(chr(32), chr(95))}"
+    filepath = OUTPUT_DIR / f"{output_filename}.pdf"
+    doc = KaiharaDocTemplate(str(filepath), pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=30*mm, bottomMargin=30*mm, report_title=title, author=author)
+    styles = _get_styles()
     story = []
-    
-    # Title
-    story.append(Paragraph(title, styles['CustomTitle']))
-    story.append(HRFlowable(width="100%", thickness=2, color=HexColor('#8b5cf6')))
-    story.append(Spacer(1, 20))
-    
-    # Content blocks
+    story.append(Spacer(1, 15*mm))
+    story.append(Paragraph(title, styles["ReportTitle"]))
+    if subtitle:
+        story.append(Paragraph(subtitle, styles["ReportSubtitle"]))
+    else:
+        story.append(Paragraph(f"Generated by {author} — {datetime.now().strftime('%d %B %Y %H:%M')}", styles["ReportSubtitle"]))
+    story.append(_make_section_divider())
+    story.append(Spacer(1, 5*mm))
     for block in content:
-        block_type = block.get('type', 'paragraph')
-        
-        if block_type == 'heading':
-            level = block.get('level', 2)
-            text = block.get('text', '')
-            style_name = f'Heading{level}' if level <= 5 else 'Heading5'
-            story.append(Paragraph(text, styles[style_name]))
-            
-        elif block_type == 'paragraph':
-            text = block.get('text', '')
-            story.append(Paragraph(text, styles['CustomParagraph']))
-            
-        elif block_type == 'list':
-            items = block.get('items', [])
-            for item in items:
-                story.append(Paragraph(f"• {item}", styles['CustomParagraph']))
-                
-        elif block_type == 'table':
-            headers = block.get('headers', [])
-            rows = block.get('rows', [])
-            
-            data = [headers] + rows
-            table = Table(data)
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), HexColor('#8b5cf6')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), white),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 11),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), HexColor('#f5f5f5')),
-                ('GRID', (0, 0), (-1, -1), 1, HexColor('#e0e0e0')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, HexColor('#f9f9f9')]),
-            ]))
-            story.append(table)
-            story.append(Spacer(1, 12))
-            
-        elif block_type == 'spacer':
-            height = block.get('height', 20)
-            story.append(Spacer(1, height))
-    
-    # Build PDF
+        bt = block.get("type", "paragraph")
+        if bt == "heading":
+            level = block.get("level", 2)
+            text = block.get("text", "")
+            if level <= 2:
+                story.append(Paragraph(text, styles["SectionHeading"]))
+                story.append(_make_section_divider())
+            else:
+                story.append(Paragraph(text, styles["SubHeading"]))
+        elif bt == "paragraph":
+            story.append(Paragraph(block.get("text", ""), styles["BodyText2"]))
+        elif bt == "bullet":
+            for item in block.get("items", []):
+                story.append(Paragraph(f"<bullet>&bull;</bullet> {item}", styles["BulletItem"]))
+            story.append(Spacer(1, 3*mm))
+        elif bt == "table":
+            headers = block.get("headers", [])
+            rows = block.get("rows", [])
+            if headers and rows:
+                story.append(_make_table(headers, rows))
+                story.append(Spacer(1, 5*mm))
+        elif bt == "highlight":
+            story.append(_make_highlight_box(block.get("text", ""), styles))
+            story.append(Spacer(1, 4*mm))
+        elif bt == "divider":
+            story.append(_make_section_divider())
+        elif bt == "spacer":
+            story.append(Spacer(1, block.get("height", 20)))
+    story.append(Spacer(1, 10*mm))
+    story.append(_make_section_divider())
+    story.append(Paragraph("End of Report — Ghazwah Group", styles["SmallGray"]))
     doc.build(story)
-    
-    logger.info(f"PDF generated: {filepath}")
     return str(filepath)
-
-
-def generate_invoice(
-    invoice_number: str,
-    from_name: str,
-    from_address: str,
-    to_name: str,
-    to_address: str,
-    items: list[dict],
-    tax_rate: float = 0.0,
-    notes: str = "",
-    output_filename: Optional[str] = None,
-) -> str:
-    """Generate an invoice PDF.
-    
-    Args:
-        invoice_number: Invoice number
-        from_name: Sender name/company
-        from_address: Sender address
-        to_name: Recipient name/company
-        to_address: Recipient address
-        items: List of items with 'description', 'quantity', 'price'
-        tax_rate: Tax rate (e.g., 0.06 for 6%)
-        notes: Additional notes
-        output_filename: Custom filename
-    
-    Returns:
-        Path to generated PDF
-    """
-    if not output_filename:
-        output_filename = f"invoice_{invoice_number}"
-    
-    filepath = OUTPUT_DIR / f"{output_filename}.pdf"
-    
-    doc = SimpleDocTemplate(
-        str(filepath),
-        pagesize=A4,
-        rightMargin=25*mm,
-        leftMargin=25*mm,
-        topMargin=25*mm,
-        bottomMargin=25*mm,
-    )
-    
-    styles = getSampleStyleSheet()
-    
-    story = []
-    
-    # Header
-    story.append(Paragraph("INVOICE", styles['Heading1']))
-    story.append(Spacer(1, 10))
-    
-    # Invoice info
-    invoice_data = [
-        ['Invoice Number:', invoice_number],
-        ['Date:', 'January 2026'],
-    ]
-    invoice_table = Table(invoice_data, colWidths=[100, 200])
-    invoice_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-    ]))
-    story.append(invoice_table)
-    story.append(Spacer(1, 20))
-    
-    # From/To addresses
-    address_data = [
-        [Paragraph(f"<b>From:</b><br/>{from_name}<br/>{from_address}", styles['Normal']),
-         Paragraph(f"<b>To:</b><br/>{to_name}<br/>{to_address}", styles['Normal'])]
-    ]
-    address_table = Table(address_data, colWidths=[250, 250])
-    story.append(address_table)
-    story.append(Spacer(1, 20))
-    
-    # Items table
-    headers = ['Description', 'Qty', 'Price', 'Total']
-    rows = []
-    subtotal = 0
-    
-    for item in items:
-        qty = item.get('quantity', 1)
-        price = item.get('price', 0)
-        total = qty * price
-        subtotal += total
-        rows.append([
-            item.get('description', ''),
-            str(qty),
-            f"RM {price:.2f}",
-            f"RM {total:.2f}"
-        ])
-    
-    # Add subtotal, tax, total
-    tax = subtotal * tax_rate
-    grand_total = subtotal + tax
-    
-    rows.append(['', '', 'Subtotal:', f"RM {subtotal:.2f}"])
-    if tax_rate > 0:
-        rows.append(['', '', f'Tax ({tax_rate*100:.0f}%):', f"RM {tax:.2f}"])
-    rows.append(['', '', 'Total:', f"RM {grand_total:.2f}"])
-    
-    items_table = Table([headers] + rows, colWidths=[200, 60, 100, 100])
-    items_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#8b5cf6')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, len(items)), 1, HexColor('#e0e0e0')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, len(items)), [white, HexColor('#f9f9f9')]),
-        ('LINEBELOW', (0, -1), (-1, -1), 2, HexColor('#8b5cf6')),
-    ]))
-    story.append(items_table)
-    
-    # Notes
-    if notes:
-        story.append(Spacer(1, 20))
-        story.append(Paragraph(f"<b>Notes:</b> {notes}", styles['Normal']))
-    
-    # Footer
-    story.append(Spacer(1, 40))
-    story.append(HRFlowable(width="100%", thickness=1, color=HexColor('#e0e0e0')))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph("Generated by Kaihara OS", styles['Normal']))
-    
-    doc.build(story)
-    
-    logger.info(f"Invoice generated: {filepath}")
-    return str(filepath)
-
-
-def generate_certificate(
-    recipient_name: str,
-    certificate_title: str,
-    description: str,
-    issue_date: str,
-    issuer_name: str = "Kaihara OS",
-    output_filename: Optional[str] = None,
-) -> str:
-    """Generate a certificate PDF.
-    
-    Args:
-        recipient_name: Name of the recipient
-        certificate_title: Title of the certificate
-        description: Description of achievement
-        issue_date: Date of issue
-        issuer_name: Name of issuing organization
-        output_filename: Custom filename
-    
-    Returns:
-        Path to generated PDF
-    """
-    if not output_filename:
-        output_filename = f"certificate_{recipient_name.lower().replace(' ', '_')}"
-    
-    filepath = OUTPUT_DIR / f"{output_filename}.pdf"
-    
-    doc = SimpleDocTemplate(
-        str(filepath),
-        pagesize=letter,
-        rightMargin=1*inch,
-        leftMargin=1*inch,
-        topMargin=1*inch,
-        bottomMargin=1*inch,
-    )
-    
-    styles = getSampleStyleSheet()
-    
-    story = []
-    
-    # Border decoration
-    story.append(Spacer(1, 50))
-    
-    # Title
-    story.append(Paragraph("CERTIFICATE", styles['Title']))
-    story.append(Spacer(1, 20))
-    
-    # Subtitle
-    story.append(Paragraph(certificate_title, styles['Heading2']))
-    story.append(Spacer(1, 30))
-    
-    # Recipient
-    story.append(Paragraph("This is to certify that", styles['Normal']))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph(recipient_name, styles['Heading1']))
-    story.append(Spacer(1, 20))
-    
-    # Description
-    story.append(Paragraph(description, styles['Normal']))
-    story.append(Spacer(1, 40))
-    
-    # Date and issuer
-    story.append(Paragraph(f"Issued on: {issue_date}", styles['Normal']))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph(issuer_name, styles['Normal']))
-    
-    doc.build(story)
-    
-    logger.info(f"Certificate generated: {filepath}")
-    return str(filepath)
-
-
-def generate_text_pdf(
-    text: str,
-    output_filename: Optional[str] = None,
-    title: Optional[str] = None,
-) -> str:
-    """Generate a simple PDF from text content.
-    
-    Args:
-        text: Plain text content
-        output_filename: Custom filename
-        title: Optional title
-    
-    Returns:
-        Path to generated PDF
-    """
-    if not output_filename:
-        output_filename = "document"
-    
-    filepath = OUTPUT_DIR / f"{output_filename}.pdf"
-    
-    doc = SimpleDocTemplate(
-        str(filepath),
-        pagesize=A4,
-        rightMargin=25*mm,
-        leftMargin=25*mm,
-        topMargin=25*mm,
-        bottomMargin=25*mm,
-    )
-    
-    styles = getSampleStyleSheet()
-    
-    story = []
-    
-    if title:
-        story.append(Paragraph(title, styles['Title']))
-        story.append(Spacer(1, 20))
-    
-    # Split text into paragraphs
-    paragraphs = text.split('\n\n')
-    for para in paragraphs:
-        if para.strip():
-            story.append(Paragraph(para.strip(), styles['Normal']))
-            story.append(Spacer(1, 12))
-    
-    doc.build(story)
-    
-    logger.info(f"Text PDF generated: {filepath}")
-    return str(filepath)
-
-
-# Tool registration for Kaihara
-TOOLS = {
-    "generate_pdf_report": generate_pdf_report,
-    "generate_invoice": generate_invoice,
-    "generate_certificate": generate_certificate,
-    "generate_text_pdf": generate_text_pdf,
-}

@@ -42,6 +42,7 @@ class WhatsAppChannel(BaseChannel):
         try:
             self._process = await asyncio.create_subprocess_exec(
                 "node", bridge_path,
+                stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
